@@ -1,0 +1,12 @@
+allure-results
+APP
+.apk
+*.iml
+*.xml
+.idea
+.venv
+.env
+__pycache__/
+*.pyc
+.vscode
+.DS_Store
