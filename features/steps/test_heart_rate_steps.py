@@ -55,5 +55,57 @@ def verify_sleep_hr_details(heart_rate_page: HeartRatePage):
     heart_rate_page.verify_sleep_hr_details()
 
 
+# ── RHR card -> Resting Heart Rate dialog (value match + WEEK/MONTH/6M graphs) ─
+
+@when('the user opens the RHR card')
+def open_rhr_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.open_rhr_card()
+
+
+@then('the Resting Heart Rate dialog is shown')
+def rhr_dialog_shown(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_rhr_dialog_title()
+
+
+@then('the dialog value matches the RHR card value')
+def rhr_value_matches_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_rhr_dialog_value_matches_card()
+
+
+@then('the weekly heart rate graph is plotted')
+def weekly_graph(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_week_graph()
+
+
+@when('the user selects the Month view')
+def select_month(heart_rate_page: HeartRatePage):
+    heart_rate_page.select_month_view()
+
+
+@then('the monthly heart rate graph is plotted')
+def monthly_graph(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_month_graph()
+
+
+@when('the user selects the 6 Month view')
+def select_6m(heart_rate_page: HeartRatePage):
+    heart_rate_page.select_6m_view()
+
+
+@then('the 6 month heart rate graph is plotted')
+def sixm_graph(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_6m_graph()
+
+
+@when('the user closes the Resting Heart Rate dialog')
+def close_rhr_dialog(heart_rate_page: HeartRatePage):
+    heart_rate_page.close_rhr_dialog()
+
+
+@then('the Resting Heart Rate dialog is closed')
+def rhr_dialog_closed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_dialog_closed()
+
+
 # Register the scenarios — must come after the step definitions.
 scenarios("../heart_rate.feature")

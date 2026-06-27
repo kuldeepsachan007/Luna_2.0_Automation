@@ -1,4 +1,5 @@
 import re
+import time
 
 from pages.base_page import BasePage
 from utility.liberaries.decorators import logger
@@ -142,3 +143,123 @@ class HeartRatePage(BasePage):
                 f"'{name}' value is missing"
             logger.info("Sleep HR detail OK: %s = %s", name, value)
         self.capture_screenshot("Sleep_HR_Details")
+
+    # ── internal: reliable Compose tap ──────────────────────────────────────
+    # UiAutomator2's clickGesture on the element triggers Compose click handlers
+    # reliably (a plain coordinate 'mobile: tap' was ignored by some controls).
+    def _tap(self, locator, timeout=5):
+        el = self.mouse.find_element(self.driver, locator, timeout=timeout)
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
+        except Exception as e:
+            logger.warning("clickGesture failed (%s); falling back to coordinate tap", e)
+            rect = el.rect
+            cx = int(rect["x"] + rect["width"] / 2)
+            cy = int(rect["y"] + rect["height"] / 2)
+            self.mouse.click_coordinates(self.driver, cx, cy)
+
+    def _verify_graph_plotted(self, name, avg_loc, axis_loc):
+        """A period graph is 'plotted' when its period-average label and one of
+        its X-axis labels are shown. The bars + Y-axis are Canvas-drawn (not
+        queryable), so a screenshot is captured too."""
+        self.waits.wait_for_visible(self.driver, avg_loc, timeout=10)
+        assert self.forms.is_element_displayed(self.driver, axis_loc, timeout=5), \
+            f"{name} heart-rate graph X-axis labels not shown"
+        logger.info("%s heart-rate graph plotted", name)
+        self.capture_screenshot(f"HR_Graph_{name}")
+
+    # ── RHR card -> Resting Heart Rate dialog ────────────────────────────────
+    def open_rhr_card(self):
+        """Capture the RHR card value (for later comparison), then tap the card
+        EXACTLY ONCE to open the Resting Heart Rate dialog.
+
+        Important: tap only once. The dialog takes a moment to load its data, and
+        a second tap would land outside the still-opening dialog and dismiss it —
+        so we tap once and then wait patiently for the dialog title."""
+        self._ensure_visible(self.locator.RHR_LABEL)
+        self._rhr_card_value = self.forms.get_value(self.driver, self.locator.RHR_VALUE, timeout=5)
+        logger.info("RHR card value (before opening): %s", self._rhr_card_value)
+        card = self.mouse.find_element(self.driver, self.locator.RHR_CARD, timeout=5)
+        # Click the card element ONCE via UiAutomator2's clickGesture (a proper
+        # click that triggers the Compose handler; a plain coordinate 'mobile: tap'
+        # did not open this card). Fall back to a coordinate tap if unsupported.
+        logger.info("Clicking the RHR card element (clickGesture)")
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": card.id})
+        except Exception as e:
+            logger.warning("clickGesture failed (%s); falling back to coordinate tap", e)
+            rect = card.rect
+            cx = int(rect["x"] + rect["width"] / 2)
+            cy = int(rect["y"] + rect["height"] / 2)
+            self.mouse.click_coordinates(self.driver, cx, cy)
+        assert self.forms.is_element_displayed(self.driver, self.locator.RHR_DIALOG_TITLE, timeout=15), \
+            "Tapped the RHR card but the Resting Heart Rate dialog did not open"
+        logger.info("Opened the Resting Heart Rate dialog")
+        self.capture_screenshot("RHR_Dialog")
+
+    def verify_rhr_dialog_title(self):
+        self.waits.wait_for_visible(self.driver, self.locator.RHR_DIALOG_TITLE, timeout=10)
+        logger.info("'Resting Heart Rate' dialog title shown")
+        self.capture_screenshot("RHR_Dialog_Title")
+
+    def verify_rhr_dialog_value_matches_card(self):
+        """The value shown in the dialog must match the value that was on the
+        RHR card. The dialog loads its data after opening, so poll until the
+        dialog value renders as a number, then compare the numeric parts
+        (values are dynamic)."""
+        card_val = getattr(self, "_rhr_card_value", None)
+        m = re.search(r"\d+", str(card_val or ""))
+        assert m, f"RHR card value was not captured: {card_val!r}"
+        card_num = m.group()
+        # Wait for the dialog to finish loading its data (the weekly average and
+        # chart appear) before reading the value.
+        self.waits.wait_for_visible(self.driver, self.locator.WEEKLY_AVERAGE, timeout=15)
+        # Primary: read the big current value (the number next to "bpm").
+        dlg_num = None
+        for _ in range(6):
+            v = self.forms.get_value(self.driver, self.locator.RHR_DIALOG_VALUE, timeout=2)
+            mm = re.search(r"\d+", str(v or ""))
+            if mm and v and "Resting" not in str(v):
+                dlg_num = mm.group()
+                break
+            time.sleep(1)
+        # Fallback: the card's value should be shown somewhere in the dialog.
+        if dlg_num is None:
+            value_text = ("xpath", f'//android.widget.TextView[@text="{card_num}"]')
+            assert self.forms.is_element_displayed(self.driver, value_text, timeout=5), \
+                f"The dialog does not show the RHR card value {card_num!r}"
+            dlg_num = card_num
+        assert card_num == dlg_num, \
+            f"RHR value mismatch: card={card_num!r} but dialog shows {dlg_num!r}"
+        logger.info("RHR value matches: card=%s, dialog=%s", card_num, dlg_num)
+        self.capture_screenshot("RHR_Value_Match")
+
+    def verify_week_graph(self):
+        # WEEK is selected by default when the dialog opens.
+        self._verify_graph_plotted("Week", self.locator.WEEKLY_AVERAGE, self.locator.WEEK_AXIS_SAMPLE)
+
+    def select_month_view(self):
+        self._tap(self.locator.TAB_MONTH)
+        logger.info("Selected the MONTH view")
+        time.sleep(3)  # pause between views so each graph renders / is observable
+
+    def verify_month_graph(self):
+        self._verify_graph_plotted("Month", self.locator.MONTHLY_AVERAGE, self.locator.MONTH_AXIS_SAMPLE)
+
+    def select_6m_view(self):
+        self._tap(self.locator.TAB_6M)
+        logger.info("Selected the 6M view")
+        time.sleep(3)  # pause between views so each graph renders / is observable
+
+    def verify_6m_graph(self):
+        self._verify_graph_plotted("6M", self.locator.SIX_MONTH_AVERAGE, self.locator.SIXM_AXIS_SAMPLE)
+
+    def close_rhr_dialog(self):
+        self._tap(self.locator.DIALOG_CLOSE)
+        logger.info("Tapped the dialog Close (X)")
+        self.capture_screenshot("RHR_Dialog_Closed")
+
+    def verify_dialog_closed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.RHR_DIALOG_TITLE, timeout=8), \
+            "The Resting Heart Rate dialog did not close"
+        logger.info("Resting Heart Rate dialog is closed")
