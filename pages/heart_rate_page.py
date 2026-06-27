@@ -189,24 +189,29 @@ class HeartRatePage(BasePage):
         except Exception:
             raise AssertionError("Tapped the card but its detail dialog did not open")
 
-    def _assert_dialog_value_matches(self, card_value, name):
+    def _assert_dialog_value_matches(self, card_value, name, value_loc=None):
         """The dialog's current value must match the value on the card. Wait for
         the dialog to load (weekly average shown), then read the value; values
-        are dynamic, so compare the numeric parts."""
+        are dynamic, so compare the leading numeric parts (e.g. card "3h 0m" vs
+        dialog "3.0" both -> 3)."""
+        value_loc = value_loc or self.locator.DIALOG_VALUE
         m = re.search(r"\d+", str(card_value or ""))
         assert m, f"{name} card value was not captured: {card_value!r}"
         card_num = m.group()
         self.waits.wait_for_visible(self.driver, self.locator.WEEKLY_AVERAGE, timeout=15)
         dlg_num = None
         for _ in range(6):
-            v = self.forms.get_value(self.driver, self.locator.DIALOG_VALUE, timeout=2)
+            v = self.forms.get_value(self.driver, value_loc, timeout=2)
             mm = re.search(r"\d+", str(v or ""))
-            if mm and v and "Heart Rate" not in str(v):
+            if mm and v and "Heart Rate" not in str(v) and "Lowest" not in str(v):
                 dlg_num = mm.group()
                 break
             time.sleep(1)
-        if dlg_num is None:  # fallback: the card value should appear in the dialog
-            value_text = ("xpath", f'//android.widget.TextView[@text="{card_num}"]')
+        if dlg_num is None:  # fallback: the card's value should appear in the dialog
+            # Match the card's leading number exactly OR as a decimal, e.g. card
+            # "3h 0m" -> "3" also matches the dialog's "3.0".
+            value_text = ("xpath",
+                f'//android.widget.TextView[@text="{card_num}" or starts-with(@text, "{card_num}.")]')
             assert self.forms.is_element_displayed(self.driver, value_text, timeout=5), \
                 f"The dialog does not show the {name} card value {card_num!r}"
             dlg_num = card_num
@@ -289,3 +294,27 @@ class HeartRatePage(BasePage):
     def verify_avg_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.AVG_DIALOG_TITLE, timeout=8), \
             "The Avg Sleep Heart Rate dialog did not close"
+
+    # ── TIME TO LOW card -> Time to Lowest HR dialog (same layout; value in h) ─
+    def open_ttl_card(self):
+        self._ensure_visible(self.locator.TIME_TO_LOW_LABEL)
+        self._ttl_card_value = self.forms.get_value(self.driver, self.locator.TIME_TO_LOW_VALUE, timeout=5)
+        logger.info("TIME TO LOW card value (before opening): %s", self._ttl_card_value)
+        self._open_dialog_via_card(self.locator.TTL_CARD, self.locator.TTL_DIALOG_TITLE)
+        logger.info("Opened the Time to Lowest HR dialog")
+        self.capture_screenshot("TTL_Dialog")
+
+    def verify_ttl_dialog_title(self):
+        self.waits.wait_for_visible(self.driver, self.locator.TTL_DIALOG_TITLE, timeout=10)
+        logger.info("'Time to Lowest HR' dialog title shown")
+
+    def verify_ttl_dialog_value_matches_card(self):
+        self._assert_dialog_value_matches(
+            getattr(self, "_ttl_card_value", None), "Time to Low", self.locator.TTL_DIALOG_VALUE)
+
+    def close_ttl_dialog(self):
+        self._close_dialog(self.locator.TTL_DIALOG_TITLE, "Time to Lowest HR")
+
+    def verify_ttl_dialog_closed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.TTL_DIALOG_TITLE, timeout=8), \
+            "The Time to Lowest HR dialog did not close"

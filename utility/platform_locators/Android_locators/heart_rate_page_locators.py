@@ -48,6 +48,12 @@ RHR_CARD          = (AppiumBy.XPATH, '//android.widget.TextView[@text="RHR"]/par
 RHR_DIALOG_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Resting Heart Rate"]')
 AVG_SLEEP_CARD    = (AppiumBy.XPATH, '//android.widget.TextView[@text="AVG SLEEP HR"]/parent::android.view.View')
 AVG_DIALOG_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Avg Sleep Heart Rate"]')
+# TIME TO LOW card -> "Time to Lowest HR" dialog. Same layout, but the value is
+# a DURATION in hours: "3.0" + "h" (the card shows "3h 0m"); value = the number
+# before the standalone "h".
+TTL_CARD          = (AppiumBy.XPATH, '//android.widget.TextView[@text="TIME TO LOW"]/parent::android.view.View')
+TTL_DIALOG_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Time to Lowest HR"]')
+TTL_DIALOG_VALUE  = (AppiumBy.XPATH, '(//android.widget.TextView[@text="h"])[1]/preceding-sibling::android.widget.TextView[1]')
 # Current value (generic for both dialogs): layout "<num>" -> "bpm" (siblings);
 # the only bare "bpm" in the dialog is the current-value unit, so its preceding
 # sibling is the value.

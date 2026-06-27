@@ -36,3 +36,14 @@ Feature: Luna 2.0 Heart Rate details
     Then the 6 month heart rate graph is plotted
     When the user closes the Avg Sleep Heart Rate dialog
     Then the Avg Sleep Heart Rate dialog is closed
+
+    When the user opens the TIME TO LOW card
+    Then the Time to Lowest HR dialog is shown
+    And the dialog value matches the TIME TO LOW card value
+    And the weekly heart rate graph is plotted
+    When the user selects the Month view
+    Then the monthly heart rate graph is plotted
+    When the user selects the 6 Month view
+    Then the 6 month heart rate graph is plotted
+    When the user closes the Time to Lowest HR dialog
+    Then the Time to Lowest HR dialog is closed

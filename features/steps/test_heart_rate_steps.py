@@ -135,5 +135,32 @@ def avg_dialog_closed(heart_rate_page: HeartRatePage):
     heart_rate_page.verify_avg_dialog_closed()
 
 
+# ── TIME TO LOW card -> Time to Lowest HR dialog (mirrors the RHR/AVG flow) ────
+
+@when('the user opens the TIME TO LOW card')
+def open_ttl_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.open_ttl_card()
+
+
+@then('the Time to Lowest HR dialog is shown')
+def ttl_dialog_shown(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_ttl_dialog_title()
+
+
+@then('the dialog value matches the TIME TO LOW card value')
+def ttl_value_matches_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_ttl_dialog_value_matches_card()
+
+
+@when('the user closes the Time to Lowest HR dialog')
+def close_ttl_dialog(heart_rate_page: HeartRatePage):
+    heart_rate_page.close_ttl_dialog()
+
+
+@then('the Time to Lowest HR dialog is closed')
+def ttl_dialog_closed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_ttl_dialog_closed()
+
+
 # Register the scenarios — must come after the step definitions.
 scenarios("../heart_rate.feature")
