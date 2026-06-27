@@ -42,13 +42,16 @@ AVG_SLEEP_HR_VALUE = (AppiumBy.XPATH, '//android.widget.TextView[@text="AVG SLEE
 TIME_TO_LOW_LABEL  = (AppiumBy.XPATH, '//android.widget.TextView[@text="TIME TO LOW"]')
 TIME_TO_LOW_VALUE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="TIME TO LOW"]/following-sibling::android.widget.TextView[1]')
 
-# ── RHR card -> "Resting Heart Rate" detail dialog ───────────────────────────
-# The RHR card is clickable (parent View clk=true). Tap by coordinates.
+# ── Metric cards -> detail dialogs (RHR + AVG Sleep HR share the same layout) ─
+# Cards are clickable (parent View clk=true). Tap via clickGesture.
 RHR_CARD          = (AppiumBy.XPATH, '//android.widget.TextView[@text="RHR"]/parent::android.view.View')
 RHR_DIALOG_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Resting Heart Rate"]')
-# Current value: layout "<num>" -> "bpm" (siblings); the only bare "bpm" in the
-# dialog is the current-value unit, so its preceding sibling is the value.
-RHR_DIALOG_VALUE  = (AppiumBy.XPATH, '(//android.widget.TextView[@text="bpm"])[1]/preceding-sibling::android.widget.TextView[1]')
+AVG_SLEEP_CARD    = (AppiumBy.XPATH, '//android.widget.TextView[@text="AVG SLEEP HR"]/parent::android.view.View')
+AVG_DIALOG_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Avg Sleep Heart Rate"]')
+# Current value (generic for both dialogs): layout "<num>" -> "bpm" (siblings);
+# the only bare "bpm" in the dialog is the current-value unit, so its preceding
+# sibling is the value.
+DIALOG_VALUE      = (AppiumBy.XPATH, '(//android.widget.TextView[@text="bpm"])[1]/preceding-sibling::android.widget.TextView[1]')
 DIALOG_CLOSE      = (AppiumBy.XPATH, '//android.view.View[@content-desc="Close"]')
 
 # Range tabs (TextViews; tap by coordinates like other Compose controls).

@@ -107,5 +107,33 @@ def rhr_dialog_closed(heart_rate_page: HeartRatePage):
     heart_rate_page.verify_dialog_closed()
 
 
+# ── AVG SLEEP HR card -> Avg Sleep Heart Rate dialog (mirrors the RHR flow) ───
+# The WEEK/MONTH/6M graph + tab-select steps above are reused for this dialog.
+
+@when('the user opens the AVG Sleep HR card')
+def open_avg_sleep_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.open_avg_sleep_card()
+
+
+@then('the Avg Sleep Heart Rate dialog is shown')
+def avg_dialog_shown(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_avg_dialog_title()
+
+
+@then('the dialog value matches the AVG Sleep HR card value')
+def avg_value_matches_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_avg_dialog_value_matches_card()
+
+
+@when('the user closes the Avg Sleep Heart Rate dialog')
+def close_avg_dialog(heart_rate_page: HeartRatePage):
+    heart_rate_page.close_avg_dialog()
+
+
+@then('the Avg Sleep Heart Rate dialog is closed')
+def avg_dialog_closed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_avg_dialog_closed()
+
+
 # Register the scenarios — must come after the step definitions.
 scenarios("../heart_rate.feature")
