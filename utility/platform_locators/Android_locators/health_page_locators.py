@@ -40,23 +40,26 @@ SKIN_TEMP_MEASURE_BTN  = (AppiumBy.XPATH, '(//android.widget.TextView[@text="MEA
 STRESS_MEASURE_BTN     = (AppiumBy.XPATH, '(//android.widget.TextView[@text="MEASURE"])[1]')
 HEART_RATE_MEASURE_BTN = (AppiumBy.XPATH, '(//android.widget.TextView[@text="MEASURE"])[2]')
 
-# ── Tile values (PROVISIONAL) ────────────────────────────────────────────────
-# On the landing dump only Stress (11) and Heart Rate (83 bpm) had numeric
-# values; SpO2 and Skin Temp showed an icon until first measured. These anchor
-# off the nearby unit text and should be re-checked against a post-measurement
-# dump.
+# ── Tile values (CONFIRMED from post-measurement dump 2026-06-27) ─────────────
+# All tiles are flat siblings under one ScrollView, so the value sits as the
+# immediately-preceding sibling of its unit text:
+#   SpO2 "98" + "%",  Stress "38" + "/100",  Heart Rate "82" + "bpm",
+#   Skin Temp <num> + "°...". The tile "bpm" is the first in document order
+# (later "bpm" belong to the sleep RHR + Heart Rate card).
+SPO2_TILE_VALUE       = (AppiumBy.XPATH, '//android.widget.TextView[@text="%"]/preceding-sibling::android.widget.TextView[1]')
 STRESS_TILE_VALUE     = (AppiumBy.XPATH, '//android.widget.TextView[@text="/100"]/preceding-sibling::android.widget.TextView[1]')
 HEART_RATE_TILE_VALUE = (AppiumBy.XPATH, '(//android.widget.TextView[@text="bpm"])[1]/preceding-sibling::android.widget.TextView[1]')
-SPO2_TILE_VALUE       = (AppiumBy.XPATH, '//android.widget.TextView[@text="%"]/preceding-sibling::android.widget.TextView[1]')
-SKIN_TEMP_TILE_VALUE  = (AppiumBy.XPATH, '//android.widget.TextView[contains(@text,"°")]')
+SKIN_TEMP_TILE_VALUE  = (AppiumBy.XPATH, '//android.widget.TextView[contains(@text,"°")]/preceding-sibling::android.widget.TextView[1]')
 
-# ── Measurement popup (PROVISIONAL — needs a dump of the measure sheet) ───────
-# Button texts taken from the feature-file flow description.
-POPUP_TRY_AGAIN   = (AppiumBy.XPATH, '//android.widget.TextView[@text="Try Again" or @text="TRY AGAIN"]')
+# ── Measurement popup ─────────────────────────────────────────────────────────
+# CONFIRMED from SpO2 + Stress result-sheet dumps: the result screen shows the
+# reading (big number), a status word (NORMAL/…), a "DONE" button, and an "X"
+# (content-desc "Close"). The scrim above the sheet is content-desc "Close sheet".
 POPUP_DONE        = (AppiumBy.XPATH, '//android.widget.TextView[@text="Done" or @text="DONE"]')
 POPUP_CLOSE       = (AppiumBy.XPATH, '//android.view.View[@content-desc="Close" or @content-desc="Dismiss"]')
+# PROVISIONAL — failure screen not yet seen; text guessed from the feature file.
+POPUP_TRY_AGAIN   = (AppiumBy.XPATH, '//android.widget.TextView[@text="Try Again" or @text="TRY AGAIN"]')
 POPUP_NO_READING  = (AppiumBy.XPATH, '//android.widget.TextView[contains(@text,"Couldn") and contains(@text,"reading")]')
-POPUP_READING_VALUE = (AppiumBy.XPATH, '//android.widget.TextView')  # refine with popup dump
 
 # ── Cards below the tiles (PROVISIONAL — confirm after scrolling/dump) ────────
 # The Heart Rate card uses "BPM" (uppercase) vs the tile's "bpm" (lowercase).

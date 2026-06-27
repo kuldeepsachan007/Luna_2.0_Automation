@@ -146,13 +146,10 @@ class HealthPage(BasePage):
                 # second failure: close and move on
                 self._go_back(self.locator.POPUP_CLOSE)
                 return False
-            # success: capture the reading then tap Done
-            try:
-                self._readings[name] = self.forms.get_value(
-                    self.driver, self.locator.POPUP_READING_VALUE, timeout=3,
-                )
-            except Exception:
-                self._readings[name] = None
+            # success: tap Done. The reading is validated on the tile afterwards
+            # via verify_reading_matches_tile; the in-popup value is not captured
+            # here because it has no stable locator yet.
+            self._readings[name] = None
             self.capture_screenshot(f"{name}_Reading_Success")
             self._go_back(self.locator.POPUP_DONE)
             return True
