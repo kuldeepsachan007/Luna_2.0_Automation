@@ -26,6 +26,11 @@ BACK           = (AppiumBy.XPATH, '//android.view.View[@content-desc="Back"]')
 
 # ── Sleep HR / Workout HR / Idle HR sections ─────────────────────────────────
 SLEEP_HR       = (AppiumBy.XPATH, '//android.widget.TextView[@text="Sleep HR"]')
+# The clickable element is the ROW (parent View, clickable=true), NOT the
+# "Sleep HR" text (clickable=false) — tap the row to expand/collapse.
+SLEEP_HR_ROW   = (AppiumBy.XPATH, '//android.widget.TextView[@text="Sleep HR"]/parent::android.view.View')
+# When expanded, the row's chevron content-desc flips Expand -> Collapse.
+SLEEP_HR_COLLAPSE = (AppiumBy.XPATH, '//android.view.View[@content-desc="Collapse"]')
 WORKOUT_HR     = (AppiumBy.XPATH, '//android.widget.TextView[@text="Workout HR"]')
 IDLE_HR        = (AppiumBy.XPATH, '//android.widget.TextView[@text="Idle HR"]')
 

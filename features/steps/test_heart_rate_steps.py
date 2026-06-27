@@ -10,8 +10,8 @@ from utility.liberaries.decorators import logger
 
 @given('the user is on the Home page')
 def on_home_page(luna_home_page: HomePage):
-    logger.info("Verifying the Home page is displayed")
-    luna_home_page.verify_home_page()
+    logger.info("Ensuring the app is on the Home page")
+    luna_home_page.go_to_home_page()
 
 
 @when('the user opens the Health page')
