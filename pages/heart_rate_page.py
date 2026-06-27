@@ -65,14 +65,13 @@ class HeartRatePage(BasePage):
 
     # ── Step: HR detail page open on the current date ────────────────────────
     def verify_open_on_current_date(self):
-        """The page is the Heart Rate detail page AND showing the current day
-        (date selector reads "Today"). "Today's average" is the HR-detail marker
-        (not present on the Health landing page)."""
+        """Confirm the Heart Rate detail page loaded. The flow navigates to the
+        previous day on the Health page first (today's data is incomplete), so
+        the selected date is that day rather than 'Today'. 'Today's average' is
+        used as the HR-detail load marker."""
         self.waits.wait_for_visible(self.driver, self.locator.TODAYS_AVERAGE, timeout=15)
-        assert self.forms.is_element_displayed(self.driver, self.locator.DATE_TODAY, timeout=5), \
-            "Heart Rate page is not on the current date ('Today' not shown)"
-        logger.info("Heart Rate detail page open on current date (Today)")
-        self.capture_screenshot("HR_Detail_Current_Date")
+        logger.info("Heart Rate detail page loaded")
+        self.capture_screenshot("HR_Detail_Loaded")
 
     # ── Step: a heart-rate graph is plotted ──────────────────────────────────
     def verify_hr_graph_plotted(self):
@@ -318,3 +317,113 @@ class HeartRatePage(BasePage):
     def verify_ttl_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.TTL_DIALOG_TITLE, timeout=8), \
             "The Time to Lowest HR dialog did not close"
+
+    # ── Collapse Sleep HR; expand/collapse Workout HR ────────────────────────
+    # (SLEEP_HR_COLLAPSE is the generic "Collapse" chevron of whichever section
+    # is currently expanded.)
+    def collapse_sleep_hr(self):
+        """Minimise the Sleep HR section (it is expanded from the earlier steps)."""
+        if self.forms.is_element_displayed(self.driver, self.locator.RHR_LABEL, timeout=3):
+            self._tap(self.locator.SLEEP_HR_ROW)
+        self.capture_screenshot("Sleep_HR_Collapsed")
+
+    def verify_sleep_hr_collapsed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.RHR_LABEL, timeout=8), \
+            "Sleep HR did not collapse (RHR still shown)"
+        logger.info("Sleep HR section is collapsed")
+
+    def expand_workout_hr(self):
+        """Expand the Workout HR section. It reveals two cards which currently
+        have no value (not clickable) — interacting with them is deferred until
+        they have data."""
+        self._ensure_visible(self.locator.WORKOUT_HR)
+        self._tap(self.locator.WORKOUT_HR_ROW)
+        self.capture_screenshot("Workout_HR_Expanded")
+
+    def verify_workout_hr_expanded(self):
+        assert self.forms.is_element_displayed(self.driver, self.locator.SLEEP_HR_COLLAPSE, timeout=8), \
+            "Workout HR did not expand (no Collapse chevron)"
+        logger.info("Workout HR section is expanded (two cards shown; interaction deferred)")
+
+    def collapse_workout_hr(self):
+        self._tap(self.locator.WORKOUT_HR_ROW)
+        self.capture_screenshot("Workout_HR_Collapsed")
+
+    def verify_workout_hr_collapsed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.SLEEP_HR_COLLAPSE, timeout=8), \
+            "Workout HR did not collapse (Collapse chevron still shown)"
+        logger.info("Workout HR section is collapsed")
+
+    # ── Idle HR section + its two cards (Inactive Avg, Lowest Waking) ─────────
+    def expand_idle_hr(self):
+        self._ensure_visible(self.locator.IDLE_HR)
+        self._tap(self.locator.IDLE_HR_ROW)
+        self.capture_screenshot("Idle_HR_Expanded")
+
+    def verify_idle_hr_expanded(self):
+        assert self.forms.is_element_displayed(self.driver, self.locator.SLEEP_HR_COLLAPSE, timeout=8), \
+            "Idle HR did not expand (no Collapse chevron)"
+        logger.info("Idle HR section is expanded (two cards: Inactive Avg, Lowest Waking)")
+
+    def collapse_idle_hr(self):
+        self._tap(self.locator.IDLE_HR_ROW)
+        self.capture_screenshot("Idle_HR_Collapsed")
+
+    def verify_idle_hr_collapsed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.SLEEP_HR_COLLAPSE, timeout=8), \
+            "Idle HR did not collapse (Collapse chevron still shown)"
+        logger.info("Idle HR section is collapsed")
+
+    # INACTIVE AVG card -> Inactive Avg HR dialog
+    def open_inactive_avg_card(self):
+        self._ensure_visible(self.locator.INACTIVE_AVG_CARD)
+        self._inactive_avg_value = self.forms.get_value(self.driver, self.locator.INACTIVE_AVG_VALUE, timeout=5)
+        logger.info("INACTIVE AVG card value (before opening): %s", self._inactive_avg_value)
+        self._open_dialog_via_card(self.locator.INACTIVE_AVG_CARD, self.locator.INACTIVE_AVG_TITLE)
+        logger.info("Opened the Inactive Avg HR dialog")
+        self.capture_screenshot("Inactive_Avg_Dialog")
+
+    def verify_inactive_avg_dialog_title(self):
+        self.waits.wait_for_visible(self.driver, self.locator.INACTIVE_AVG_TITLE, timeout=10)
+        logger.info("'Inactive Avg HR' dialog title shown")
+
+    def verify_inactive_avg_value_matches_card(self):
+        self._assert_dialog_value_matches(getattr(self, "_inactive_avg_value", None), "Inactive Avg")
+
+    def close_inactive_avg_dialog(self):
+        self._close_dialog(self.locator.INACTIVE_AVG_TITLE, "Inactive Avg HR")
+
+    def verify_inactive_avg_dialog_closed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.INACTIVE_AVG_TITLE, timeout=8), \
+            "The Inactive Avg HR dialog did not close"
+
+    # LOWEST WAKING card -> Lowest Waking HR dialog
+    def open_lowest_waking_card(self):
+        self._ensure_visible(self.locator.LOWEST_WAKING_CARD)
+        self._lowest_waking_value = self.forms.get_value(self.driver, self.locator.LOWEST_WAKING_VALUE, timeout=5)
+        logger.info("LOWEST WAKING card value (before opening): %s", self._lowest_waking_value)
+        self._open_dialog_via_card(self.locator.LOWEST_WAKING_CARD, self.locator.LOWEST_WAKING_TITLE)
+        logger.info("Opened the Lowest Waking HR dialog")
+        self.capture_screenshot("Lowest_Waking_Dialog")
+
+    def verify_lowest_waking_dialog_title(self):
+        self.waits.wait_for_visible(self.driver, self.locator.LOWEST_WAKING_TITLE, timeout=10)
+        logger.info("'Lowest Waking HR' dialog title shown")
+
+    def verify_lowest_waking_value_matches_card(self):
+        self._assert_dialog_value_matches(getattr(self, "_lowest_waking_value", None), "Lowest Waking")
+
+    def close_lowest_waking_dialog(self):
+        self._close_dialog(self.locator.LOWEST_WAKING_TITLE, "Lowest Waking HR")
+
+    def verify_lowest_waking_dialog_closed(self):
+        assert self.waits.wait_for_invisible(self.driver, self.locator.LOWEST_WAKING_TITLE, timeout=8), \
+            "The Lowest Waking HR dialog did not close"
+
+    # ── Back to the Health page ──────────────────────────────────────────────
+    def go_back_to_health(self):
+        """Tap the top-left Back button to leave the Heart Rate detail page."""
+        self._ensure_visible(self.locator.BACK)
+        self._tap(self.locator.BACK)
+        logger.info("Tapped Back (returning to the Health page)")
+        self.capture_screenshot("Back_To_Health")

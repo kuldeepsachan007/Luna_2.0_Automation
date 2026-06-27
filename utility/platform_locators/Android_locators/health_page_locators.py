@@ -17,6 +17,10 @@ from appium.webdriver.common.appiumby import AppiumBy
 NAV_HEALTH = (AppiumBy.XPATH, '//android.view.View[@content-desc="Health"]')
 NAV_HOME   = (AppiumBy.XPATH, '//android.view.View[@content-desc="Home"]')
 
+# Date navigation (next to the "Today" label on the Health page).
+NAV_PREVIOUS_DAY = (AppiumBy.XPATH, '//android.view.View[@content-desc="Previous day"]')
+NAV_NEXT_DAY     = (AppiumBy.XPATH, '//android.view.View[@content-desc="Next day"]')
+
 # ── Top app-bar title ───────────────────────────────────────────────────────
 # "Health" text also appears in the bottom nav, so pin to the FIRST match
 # (the title sits at the top of the screen, first in document order).

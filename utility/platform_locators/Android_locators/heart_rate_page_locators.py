@@ -32,7 +32,18 @@ SLEEP_HR_ROW   = (AppiumBy.XPATH, '//android.widget.TextView[@text="Sleep HR"]/p
 # When expanded, the row's chevron content-desc flips Expand -> Collapse.
 SLEEP_HR_COLLAPSE = (AppiumBy.XPATH, '//android.view.View[@content-desc="Collapse"]')
 WORKOUT_HR     = (AppiumBy.XPATH, '//android.widget.TextView[@text="Workout HR"]')
+# Clickable row that expands/collapses the Workout HR section (like SLEEP_HR_ROW).
+WORKOUT_HR_ROW = (AppiumBy.XPATH, '//android.widget.TextView[@text="Workout HR"]/parent::android.view.View')
 IDLE_HR        = (AppiumBy.XPATH, '//android.widget.TextView[@text="Idle HR"]')
+IDLE_HR_ROW    = (AppiumBy.XPATH, '//android.widget.TextView[@text="Idle HR"]/parent::android.view.View')
+
+# Idle HR's two cards -> detail dialogs (same layout as RHR; bpm values).
+INACTIVE_AVG_CARD    = (AppiumBy.XPATH, '//android.widget.TextView[@text="INACTIVE AVG"]/parent::android.view.View')
+INACTIVE_AVG_VALUE   = (AppiumBy.XPATH, '//android.widget.TextView[@text="INACTIVE AVG"]/following-sibling::android.widget.TextView[1]')
+INACTIVE_AVG_TITLE   = (AppiumBy.XPATH, '//android.widget.TextView[@text="Inactive Avg HR"]')
+LOWEST_WAKING_CARD   = (AppiumBy.XPATH, '//android.widget.TextView[@text="LOWEST WAKING"]/parent::android.view.View')
+LOWEST_WAKING_VALUE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="LOWEST WAKING"]/following-sibling::android.widget.TextView[1]')
+LOWEST_WAKING_TITLE  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Lowest Waking HR"]')
 
 # ── Sleep HR expanded detail cards (label -> value is its 1st following sibling)
 RHR_LABEL          = (AppiumBy.XPATH, '//android.widget.TextView[@text="RHR"]')

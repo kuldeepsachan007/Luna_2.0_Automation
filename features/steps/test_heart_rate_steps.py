@@ -21,6 +21,12 @@ def open_health_page(health_page: HealthPage):
     health_page.verify_health_page()
 
 
+@when('the user goes to the previous day')
+def go_to_previous_day(health_page: HealthPage):
+    logger.info("Navigating to the previous day (Health page)")
+    health_page.go_to_previous_day()
+
+
 @when('the user opens the Heart Rate card')
 def open_heart_rate_card(health_page: HealthPage):
     logger.info("Scrolling to and opening the Heart Rate card")
@@ -160,6 +166,123 @@ def close_ttl_dialog(heart_rate_page: HeartRatePage):
 @then('the Time to Lowest HR dialog is closed')
 def ttl_dialog_closed(heart_rate_page: HeartRatePage):
     heart_rate_page.verify_ttl_dialog_closed()
+
+
+# ── Collapse Sleep HR, expand/collapse Workout HR (its two cards are deferred) ─
+
+@when('the user minimises the Sleep HR section')
+def minimise_sleep_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.collapse_sleep_hr()
+
+
+@then('the Sleep HR section is collapsed')
+def sleep_hr_collapsed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_sleep_hr_collapsed()
+
+
+@when('the user expands the Workout HR section')
+def expand_workout_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.expand_workout_hr()
+
+
+@then('the Workout HR section is expanded')
+def workout_hr_expanded(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_workout_hr_expanded()
+
+
+@when('the user minimises the Workout HR section')
+def minimise_workout_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.collapse_workout_hr()
+
+
+@then('the Workout HR section is collapsed')
+def workout_hr_collapsed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_workout_hr_collapsed()
+
+
+# ── Idle HR section + its two cards (Inactive Avg, Lowest Waking) ─────────────
+# The WEEK/MONTH/6M graph + tab-select steps above are reused for both dialogs.
+
+@when('the user expands the Idle HR section')
+def expand_idle_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.expand_idle_hr()
+
+
+@then('the Idle HR section is expanded')
+def idle_hr_expanded(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_idle_hr_expanded()
+
+
+@when('the user opens the Inactive Avg card')
+def open_inactive_avg_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.open_inactive_avg_card()
+
+
+@then('the Inactive Avg HR dialog is shown')
+def inactive_avg_dialog_shown(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_inactive_avg_dialog_title()
+
+
+@then('the dialog value matches the Inactive Avg card value')
+def inactive_avg_value_matches(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_inactive_avg_value_matches_card()
+
+
+@when('the user closes the Inactive Avg HR dialog')
+def close_inactive_avg_dialog(heart_rate_page: HeartRatePage):
+    heart_rate_page.close_inactive_avg_dialog()
+
+
+@then('the Inactive Avg HR dialog is closed')
+def inactive_avg_dialog_closed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_inactive_avg_dialog_closed()
+
+
+@when('the user opens the Lowest Waking card')
+def open_lowest_waking_card(heart_rate_page: HeartRatePage):
+    heart_rate_page.open_lowest_waking_card()
+
+
+@then('the Lowest Waking HR dialog is shown')
+def lowest_waking_dialog_shown(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_lowest_waking_dialog_title()
+
+
+@then('the dialog value matches the Lowest Waking card value')
+def lowest_waking_value_matches(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_lowest_waking_value_matches_card()
+
+
+@when('the user closes the Lowest Waking HR dialog')
+def close_lowest_waking_dialog(heart_rate_page: HeartRatePage):
+    heart_rate_page.close_lowest_waking_dialog()
+
+
+@then('the Lowest Waking HR dialog is closed')
+def lowest_waking_dialog_closed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_lowest_waking_dialog_closed()
+
+
+@when('the user minimises the Idle HR section')
+def minimise_idle_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.collapse_idle_hr()
+
+
+@then('the Idle HR section is collapsed')
+def idle_hr_collapsed(heart_rate_page: HeartRatePage):
+    heart_rate_page.verify_idle_hr_collapsed()
+
+
+# ── Back to the Health page ───────────────────────────────────────────────────
+
+@when('the user goes back from the Heart Rate page')
+def go_back_from_hr(heart_rate_page: HeartRatePage):
+    heart_rate_page.go_back_to_health()
+
+
+@then('the Health page is shown')
+def health_page_shown(health_page: HealthPage):
+    health_page.verify_health_page()
 
 
 # Register the scenarios — must come after the step definitions.

@@ -85,6 +85,17 @@ class HealthPage(BasePage):
         self.mouse.click(self.driver, self.locator.NAV_HEALTH)
         self.capture_screenshot("Health_Tab_Tapped")
 
+    def go_to_previous_day(self):
+        """Tap the 'Previous day' arrow next to the date to move one day back
+        (e.g. from Today to the previous date, which has complete data)."""
+        el = self.mouse.find_element(self.driver, self.locator.NAV_PREVIOUS_DAY, timeout=10)
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
+        except Exception:
+            el.click()
+        logger.info("Tapped 'Previous day' (navigated one day back)")
+        self.capture_screenshot("Health_Previous_Day")
+
     def verify_health_page(self):
         # The SpO2 tile is unique to the Health page (the bottom-nav "Health"
         # label also exists on Home), so it is the reliable page marker.
