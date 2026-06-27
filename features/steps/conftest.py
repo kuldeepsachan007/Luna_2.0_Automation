@@ -4,11 +4,17 @@ from pages.login_page import LoginPage
 from pages.signup_page import SignUpPage
 from pages.sleep_page import SleepPage
 from pages.home_page import HomePage
+from pages.health_page import HealthPage
 
 
 @pytest.fixture
 def login_page(app):
     return  LoginPage(app)
+
+
+@pytest.fixture
+def health_page(app):
+    return HealthPage(app)
 
 @pytest.fixture
 def signup_page(app):

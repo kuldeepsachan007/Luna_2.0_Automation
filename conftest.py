@@ -193,6 +193,10 @@ def driver_factory(env: Dict[str, Any]):
         w3c_caps["appium:nativeWebScreenshot"] = True
         w3c_caps["appium:newCommandTimeout"] = 3600
         w3c_caps["appium:connectHardwareKeyboard"] = True
+        # Preserve the signed-in app state between sessions (do NOT clear data /
+        # relaunch fresh) so the Health tests start from the already-paired,
+        # logged-in app. Restored after recovery dropped this cap.
+        w3c_caps["appium:noReset"] = True
 
         logger.info("Creating Appium session on %s with caps: %s", server, {k: v for k, v in w3c_caps.items() if k != "appium:udid"})
         # Use AppiumOptions as in the working code

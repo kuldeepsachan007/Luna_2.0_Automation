@@ -6,7 +6,7 @@ from utility.liberaries.decorators import logger
 @step('user lands on the home page screen')
 def verify_home_page(luna_home_page: HomePage):
     logger.info("Verifying home page")
-    luna_home_page.pytest -m one_tap_vitals -v
+    luna_home_page.verify_home_page()
 
 
 
