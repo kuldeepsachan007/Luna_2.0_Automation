@@ -102,6 +102,22 @@ class HealthPage(BasePage):
         self.waits.wait_for_visible(self.driver, self.locator.SPO2_LABEL, timeout=15)
         self.capture_screenshot("Health_Page_Visible")
 
+    def verify_back_on_health(self):
+        """After Closing a detail page (e.g. Stress), the Health page is restored
+        scrolled DOWN to the card that was opened, so the SpO2 tile marker is off
+        the top. Scroll back up (raw swipe — reliable) until SpO2 is visible to
+        confirm we are back on the Health page."""
+        size = self.driver.get_window_size()
+        w, h = int(size["width"]), int(size["height"])
+        for _ in range(6):
+            if self.forms.is_element_displayed(self.driver, self.locator.SPO2_LABEL, timeout=1):
+                break
+            # swipe finger downward = scroll the page UP (reveal content above)
+            self.driver.swipe(w // 2, int(h * 0.3), w // 2, int(h * 0.82), 500)
+        self.waits.wait_for_visible(self.driver, self.locator.SPO2_LABEL, timeout=10)
+        logger.info("Back on the Health page (SpO2 tile visible)")
+        self.capture_screenshot("Health_Page_Back")
+
     def recover_to_health_page(self):
         """Return to a known-good Health page after a section runs/fails: press
         back until the SpO2 tile reappears, falling back to the Health nav tab."""

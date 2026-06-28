@@ -18,4 +18,10 @@ Feature: Luna 2.0 Stress details
     And the stress graph is plotted for the day
     And the sum of the stage durations equals the total duration
     When the user taps the Stressed stage again to restore the view
-    And the user scrolls down to the Is today typical section
+    And the user scrolls so the Stress trends section is at the top
+    Then the WEEK, MONTH and 6 MONTHS stress trends graphs are plotted
+    And the today stress comparison is shown
+    When the user switches to the Non-activity comparison
+    Then the Non-activity stress comparison is shown
+    When the user taps the back arrow
+    Then the Health page is shown

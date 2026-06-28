@@ -1,4 +1,5 @@
 import re
+import time
 
 from pages.base_page import BasePage
 from utility.liberaries.decorators import logger
@@ -173,28 +174,112 @@ class StressPage(BasePage):
         self.capture_screenshot("Stress_Durations_Sum")
 
     # ── Step: scroll down to the "Is today typical?" section ─────────────────
-    def scroll_to_is_today_typical(self):
-        """Scroll down (past the Stress trends section) until 'Is today typical?'
-        is visible. Here the charts ('How your day unfolded' + Stress trends) sit
-        in the upper/middle of the screen, so `mobile: scrollGesture` gets
-        captured by a chart and the page won't move. A RAW swipe (driver.swipe)
-        scrolls the page regardless of what's underneath."""
+    def scroll_until_trends_at_top(self):
+        """Second scroll: ONE controlled swipe that brings the Stress trends section
+        to the top of the screen (from the stages / TOTAL DURATION view).
+
+        The 'Stress trends' TITLE is NOT a usable anchor: at the very top it slides
+        BEHIND the sticky date header and drops out of the accessibility tree. So we
+        anchor on the WEEK tab (which sits just below the title and stays in the tree
+        below the header). Landing the WEEK tab just under the header puts the title +
+        tabs at the top, with Is today typical and the DROP YOUR STRESS NOW CTA below.
+
+        The swipe distance is COMPUTED from the tab's live Y because small swipes
+        don't register a scroll on this Compose view and big fixed swipes overshoot;
+        a computed slow swipe (low fling) is reliable and accurate. A RAW driver.swipe
+        is used since charts capture mobile:scrollGesture."""
         size = self.driver.get_window_size()
         w, h = int(size["width"]), int(size["height"])
+        target = int(h * 0.16)                       # land the tabs just below the header
+        loc = self.locator.TRENDS_TAB_WEEK
+        # Phase 1: tabs start BELOW the fold; reliably scroll up until WEEK is visible.
+        # is_element_displayed(timeout=1) gives the fling time to settle before each
+        # check, so the tab isn't missed.
         for _ in range(8):
-            if self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=1):
+            if self.forms.is_element_displayed(self.driver, loc, timeout=1):
                 break
-            try:
-                # Start low (near TOTAL DURATION text, below the charts) and swipe
-                # far up so the touch-down lands on page text, not a chart.
-                self.driver.swipe(w // 2, int(h * 0.82), w // 2, int(h * 0.18), 600)
-            except Exception as e:
-                logger.debug("swipe failed: %s", e)
-                break
-        assert self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=3), \
-            "Could not scroll to the 'Is today typical?' section"
-        logger.info("Reached the 'Is today typical?' section")
-        self.capture_screenshot("Stress_Is_Today_Typical")
+            self.driver.swipe(w // 2, int(h * 0.78), w // 2, int(h * 0.32), 600)
+        # Phase 2: one computed slow swipe to lift the tabs to just below the header.
+        el = self.mouse.find_element(self.driver, loc, timeout=10)
+        distance = el.location["y"] - target
+        if distance > 50:
+            start = min(int(h * 0.88), h - 5)        # touch on the lower text (~TOTAL DURATION)
+            end = max(5, start - distance)
+            self.driver.swipe(w // 2, start, w // 2, end, 1300)
+        el = self.mouse.find_element(self.driver, loc, timeout=6)
+        y = el.location.get("y", 99999)
+        logger.info("Stress trends tabs (WEEK) Y after scroll: %s", y)
+        assert 0 < y <= int(h * 0.35), f"Could not bring the Stress trends tabs to the top (y={y})"
+        self.capture_screenshot("Stress_Trends_AtTop")
+
+    # ── internal: wait until a locator's value changes from `prev` ───────────
+    def _wait_value_change(self, locator, prev, timeout=6):
+        """Poll a locator's text until it differs from `prev` (or timeout). Used
+        after switching a trends tab so we read the re-plotted value, not the old
+        one."""
+        end = time.time() + timeout
+        while time.time() < end:
+            cur = self.forms.get_value(self.driver, locator, timeout=1)
+            if cur and cur != prev:
+                return cur
+        return self.forms.get_value(self.driver, locator, timeout=1)
+
+    # ── Step: WEEK / MONTH / 6 MONTHS trends graphs plot correctly ───────────
+    # NOTE: no separate scroll here — scroll_to_is_today_typical already lands on
+    # a screen showing BOTH the trends tabs (top) and the Is today typical section
+    # (below), so the tabs are already in view when this runs.
+    def verify_stress_trends_tabs(self):
+        """Select WEEK, MONTH and 6 MONTHS in turn. For each, confirm the trends
+        graph rendered (the 'AVG' label + a date-range that contains an en-dash)
+        and capture the range. Ranges are dynamic, so instead of fixed values we
+        assert each tab shows a valid range and that WEEK and MONTH differ — that
+        proves each tab re-plots its own period (WEEK = 7 days, MONTH = ~30 days).
+        The stacked bars are Canvas, so a screenshot is captured per tab."""
+        tabs = [("WEEK", self.locator.TRENDS_TAB_WEEK),
+                ("MONTH", self.locator.TRENDS_TAB_MONTH),
+                ("6 MONTHS", self.locator.TRENDS_TAB_6MONTHS)]
+        ranges = {}
+        for name, loc in tabs:
+            self._tap(loc)
+            if ranges:  # after the first tab, wait for the range to re-plot
+                self._wait_value_change(self.locator.TRENDS_RANGE, list(ranges.values())[-1], timeout=6)
+            else:
+                self.waits.wait_for_visible(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=8)
+            assert self.forms.is_element_displayed(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=5), \
+                f"Stress trends '{name}': AVG label not shown"
+            rng = self.forms.get_value(self.driver, self.locator.TRENDS_RANGE, timeout=5)
+            assert rng and "–" in rng, f"Stress trends '{name}': date-range not shown (got {rng!r})"
+            ranges[name] = rng
+            logger.info("Stress trends %s plotted: range=%s", name, rng)
+            self.capture_screenshot(f"Stress_Trends_{name.replace(' ', '_')}")
+        assert ranges["WEEK"] != ranges["MONTH"], \
+            f"WEEK and MONTH show the same range {ranges} — tabs are not re-plotting"
+        logger.info("OK: trends re-plot per tab — ranges: %s", ranges)
+
+    # ── Step: "Is today typical?" — TODAY comparison graph ───────────────────
+    def verify_today_comparison(self):
+        """Confirm the TODAY comparison is shown: the 'Is today typical?' title +
+        the 'Today vs typical <day>' heading. The comparison bars are Canvas, so a
+        screenshot is captured for visual confirmation."""
+        assert self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=5), \
+            "'Is today typical?' title not shown"
+        assert self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_TODAY_COMPARE, timeout=5), \
+            "TODAY comparison ('Today vs typical ...') not shown"
+        logger.info("Today comparison graph shown")
+        self.capture_screenshot("Stress_Typical_Today")
+
+    # ── Step: switch to the NON-ACTIVITY comparison ──────────────────────────
+    def tap_nonactivity_tab(self):
+        self._tap(self.locator.TYPICAL_TAB_NONACTIVITY)
+        logger.info("Tapped the NON-ACTIVITY tab")
+
+    def verify_nonactivity_comparison(self):
+        """After tapping NON-ACTIVITY the heading changes to 'Non-activity ...',
+        which confirms the comparison switched to the non-activity view."""
+        assert self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_NONACT_COMPARE, timeout=8), \
+            "NON-ACTIVITY comparison ('Non-activity ...') not shown after tapping the tab"
+        logger.info("Non-activity comparison shown")
+        self.capture_screenshot("Stress_Typical_NonActivity")
 
     # ── Step: tap Stressed again to deselect / restore the full view ─────────
     def tap_stressed_again_to_restore(self):

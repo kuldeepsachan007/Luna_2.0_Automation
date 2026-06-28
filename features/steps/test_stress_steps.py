@@ -74,9 +74,39 @@ def tap_stressed_again(stress_page: StressPage):
     stress_page.tap_stressed_again_to_restore()
 
 
-@when('the user scrolls down to the Is today typical section')
-def scroll_to_is_today_typical(stress_page: StressPage):
-    stress_page.scroll_to_is_today_typical()
+@when('the user scrolls so the Stress trends section is at the top')
+def scroll_trends_to_top(stress_page: StressPage):
+    stress_page.scroll_until_trends_at_top()
+
+
+@then('the WEEK, MONTH and 6 MONTHS stress trends graphs are plotted')
+def stress_trends_tabs(stress_page: StressPage):
+    stress_page.verify_stress_trends_tabs()
+
+
+@then('the today stress comparison is shown')
+def today_comparison_shown(stress_page: StressPage):
+    stress_page.verify_today_comparison()
+
+
+@when('the user switches to the Non-activity comparison')
+def switch_to_nonactivity(stress_page: StressPage):
+    stress_page.tap_nonactivity_tab()
+
+
+@then('the Non-activity stress comparison is shown')
+def nonactivity_comparison_shown(stress_page: StressPage):
+    stress_page.verify_nonactivity_comparison()
+
+
+@when('the user taps the back arrow')
+def tap_back_arrow(stress_page: StressPage):
+    stress_page.close_stress_page()
+
+
+@then('the Health page is shown')
+def health_page_shown(health_page: HealthPage):
+    health_page.verify_back_on_health()
 
 
 # Register the scenarios — must come after the step definitions.

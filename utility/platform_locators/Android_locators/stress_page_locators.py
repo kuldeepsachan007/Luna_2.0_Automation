@@ -36,6 +36,25 @@ DAY_GRAPH_TITLE = (AppiumBy.XPATH, '//android.widget.TextView[@text="How your da
 STRESS_TRENDS_TITLE = (AppiumBy.XPATH, '//android.widget.TextView[@text="Stress trends"]')
 IS_TODAY_TYPICAL    = (AppiumBy.XPATH, '//android.widget.TextView[@text="Is today typical?"]')
 
+# ── Stress trends: WEEK / MONTH / 6 MONTHS range tabs ────────────────────────
+# Tab labels are plain text whose parent handles the click (use clickGesture).
+TRENDS_TAB_WEEK    = (AppiumBy.XPATH, '//android.widget.TextView[@text="WEEK"]')
+TRENDS_TAB_MONTH   = (AppiumBy.XPATH, '//android.widget.TextView[@text="MONTH"]')
+TRENDS_TAB_6MONTHS = (AppiumBy.XPATH, '//android.widget.TextView[@text="6 MONTHS"]')
+TRENDS_AVG_LABEL   = (AppiumBy.XPATH, '//android.widget.TextView[@text="AVG"]')
+# The period date-range, e.g. "JUN 21 – JUN 27". It is the only text with an
+# en-dash (U+2013) in the trends area and CHANGES per tab, so it proves each tab
+# re-plots its own period. The stacked bars + Y-axis are Canvas (not queryable).
+TRENDS_RANGE       = (AppiumBy.XPATH, '(//android.widget.TextView[contains(@text,"–")])[1]')
+
+# ── "Is today typical?" comparison: TODAY / NON-ACTIVITY tabs ─────────────────
+TYPICAL_TAB_TODAY       = (AppiumBy.XPATH, '//android.widget.TextView[@text="TODAY"]')
+TYPICAL_TAB_NONACTIVITY = (AppiumBy.XPATH, '//android.widget.TextView[@text="NON-ACTIVITY"]')
+# Comparison heading switches text with the tab: "Today vs typical <day>" vs
+# "Non-activity – today vs typical <day>" — used to confirm each tab is active.
+TYPICAL_TODAY_COMPARE   = (AppiumBy.XPATH, '//android.widget.TextView[starts-with(@text,"Today vs typical")]')
+TYPICAL_NONACT_COMPARE  = (AppiumBy.XPATH, '//android.widget.TextView[starts-with(@text,"Non-activity")]')
+
 # ── The three stress stages below the timeline (mixed-case labels; the top
 #    status word "FOCUSED" is UPPERCASE, so these match only the stage rows). ──
 STAGE_RELAXED  = (AppiumBy.XPATH, '//android.widget.TextView[@text="Relaxed"]')
