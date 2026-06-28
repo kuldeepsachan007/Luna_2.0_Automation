@@ -310,7 +310,11 @@ class HealthPage(BasePage):
     # ── Stress card -> Stress detail page ────────────────────────────────────────
 
     def scroll_to_stress_card(self):
-        self._scroll_to(self.locator.STRESS_CARD)
+        """Scroll down (from the Heart Rate card) until the Stress card is
+        visible. The Stress *card* has a clickable parent (the Stress *tile* at
+        the top does not), so STRESS_CARD matches the card only."""
+        found = self._scroll_to(self.locator.STRESS_CARD)
+        assert found, "Could not scroll the Stress card into view"
         self.capture_screenshot("Stress_Card_Visible")
 
     def read_stress_card_value(self):

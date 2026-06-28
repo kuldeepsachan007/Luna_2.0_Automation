@@ -1,6 +1,6 @@
 from . import (
     login_page_locators, sign_up_page_locators, homepage_locators,
-    health_page_locators, heart_rate_page_locators,
+    health_page_locators, heart_rate_page_locators, stress_page_locators,
 )
 
 
@@ -10,3 +10,4 @@ class AndroidLocators:
     HOME_PAGE = homepage_locators
     HEALTH_PAGE = health_page_locators
     HEART_RATE_PAGE = heart_rate_page_locators
+    STRESS_PAGE = stress_page_locators

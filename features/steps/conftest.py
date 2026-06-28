@@ -6,6 +6,7 @@ from pages.sleep_page import SleepPage
 from pages.home_page import HomePage
 from pages.health_page import HealthPage
 from pages.heart_rate_page import HeartRatePage
+from pages.stress_page import StressPage
 
 
 @pytest.fixture
@@ -21,6 +22,11 @@ def health_page(app):
 @pytest.fixture
 def heart_rate_page(app):
     return HeartRatePage(app)
+
+
+@pytest.fixture
+def stress_page(app):
+    return StressPage(app)
 
 @pytest.fixture
 def signup_page(app):

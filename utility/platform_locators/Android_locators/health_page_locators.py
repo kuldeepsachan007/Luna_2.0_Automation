@@ -69,8 +69,12 @@ POPUP_NO_READING  = (AppiumBy.XPATH, '//android.widget.TextView[contains(@text,"
 # The Heart Rate card uses "BPM" (uppercase) vs the tile's "bpm" (lowercase).
 HEART_RATE_CARD       = (AppiumBy.XPATH, '(//android.widget.TextView[@text="HEART RATE"])[2]')
 HEART_RATE_CARD_VALUE = (AppiumBy.XPATH, '//android.widget.TextView[@text="BPM"]/preceding-sibling::android.widget.TextView[1]')
-STRESS_CARD           = (AppiumBy.XPATH, '(//android.widget.TextView[@text="STRESS"])[2]')
-ACTIVITY_CARD         = (AppiumBy.XPATH, '//android.widget.TextView[@text="ACTIVITY"]')
+# The STRESS *card* (lower, full-width) has a clickable parent View; the STRESS
+# *tile* (top grid) sits directly under the ScrollView, so this matches the card
+# only. Same idea for the Activity card.
+STRESS_CARD           = (AppiumBy.XPATH, '//android.widget.TextView[@text="STRESS"]/parent::*[@clickable="true"]')
+ACTIVITY_CARD         = (AppiumBy.XPATH, '//android.widget.TextView[@text="ACTIVITY"]/parent::*[@clickable="true"]')
+ACTIVITY_CARD_LABEL   = (AppiumBy.XPATH, '//android.widget.TextView[@text="ACTIVITY"]')
 STRESS_CARD_VALUE     = (AppiumBy.XPATH, '//android.widget.TextView[@text="/100"]/preceding-sibling::android.widget.TextView[1]')
 ACTIVITY_CARD_STEPS   = (AppiumBy.XPATH, '//android.widget.TextView[contains(@text,"steps") or contains(@text,"Steps")]')
 OPEN_DETAIL_ARROW     = (AppiumBy.XPATH, '//android.view.View[@content-desc="Open detail"]')

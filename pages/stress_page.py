@@ -1,0 +1,206 @@
+import re
+
+from pages.base_page import BasePage
+from utility.liberaries.decorators import logger
+
+
+class StressPage(BasePage):
+    """Luna 2.0 Stress detail page (opened from the Health page's Stress card).
+
+    A full page (not a bottom-sheet dialog) with a status word, the day's
+    average/Max/Min values, a gauge, and a "How your day unfolded" timeline.
+    Locators come from stress_page_locators.py.
+    """
+
+    def __init__(self, driver):
+        super().__init__(driver)
+        self.driver = driver
+        self.name = "Stress Page"
+        self.locator = self.get_locators().STRESS_PAGE
+
+    # ── Page open / close ────────────────────────────────────────────────────
+    def verify_stress_page_shown(self):
+        """Confirm the Stress detail page opened (title + the day's average)."""
+        self.waits.wait_for_visible(self.driver, self.locator.PAGE_TITLE, timeout=15)
+        logger.info("Stress detail page is shown")
+        self.capture_screenshot("Stress_Page")
+
+    def close_stress_page(self):
+        """Tap the top-left Close (X) to return to the Health page."""
+        el = self.mouse.find_element(self.driver, self.locator.CLOSE, timeout=10)
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
+        except Exception:
+            el.click()
+        logger.info("Closed the Stress page (back to Health)")
+        self.capture_screenshot("Stress_Page_Closed")
+
+    # ── internal: Compose-friendly scroll ────────────────────────────────────
+    def _scroll_to(self, locator, max_scrolls=8, direction="down", percent=0.85,
+                   top_frac=0.2, height_frac=0.6):
+        # The scroll band must sit OVER text (e.g. the "How your day unfolded"
+        # title / gauge), NOT over the chart — the chart captures the gesture so
+        # the page would not scroll. Callers pass a high, short band for that.
+        if self.forms.is_element_displayed(self.driver, locator, timeout=2):
+            return True
+        size = self.driver.get_window_size()
+        w, h = int(size["width"]), int(size["height"])
+        area = {"left": int(w * 0.1), "top": int(h * top_frac),
+                "width": int(w * 0.8), "height": int(h * height_frac)}
+        for _ in range(max_scrolls):
+            try:
+                self.driver.execute_script("mobile: scrollGesture", {
+                    **area, "direction": direction, "percent": percent,
+                })
+            except Exception as e:
+                logger.debug("scrollGesture failed: %s", e)
+                break
+            if self.forms.is_element_displayed(self.driver, locator, timeout=1):
+                return True
+        return self.forms.is_element_displayed(self.driver, locator, timeout=1)
+
+    # ── Step: Max / Min / Avg values are shown (gauge, at the top) ───────────
+    def verify_values_shown(self):
+        """At the top of the page, the gauge shows the day's Max, Min and Avg.
+        Values are dynamic, so assert each label is visible and its value is a
+        non-empty number."""
+        checks = [
+            ("Max", self.locator.MAX_LABEL, self.locator.MAX_VALUE),
+            ("Min", self.locator.MIN_LABEL, self.locator.MIN_VALUE),
+            ("Avg", self.locator.AVG_LABEL, self.locator.AVG_VALUE),
+        ]
+        for name, label_loc, value_loc in checks:
+            assert self.forms.is_element_displayed(self.driver, label_loc, timeout=5), \
+                f"'{name}' label is not shown"
+            value = self.forms.get_value(self.driver, value_loc, timeout=5)
+            assert value is not None and re.search(r"\d", str(value)), \
+                f"'{name}' value missing/not numeric: {value!r}"
+            logger.info("Stress %s value: %s", name, value)
+        self.capture_screenshot("Stress_Values")
+
+    # ── Step: the "How your day unfolded" graph is plotted for the day ───────
+    def verify_day_graph_plotted(self):
+        """Confirm the timeline graph is plotted across the full day. The X-axis
+        time labels (12A, 4A, 8A, 12P, 4P, 8P) are real text nodes and are all
+        asserted; the Y-axis (0/33/66/100) and the plotted line are Canvas-drawn
+        (not queryable), so a screenshot is captured for visual confirmation."""
+        self.waits.wait_for_visible(self.driver, self.locator.DAY_GRAPH_TITLE, timeout=10)
+        x_labels = ["12A", "4A", "8A", "12P", "4P", "8P"]
+        for lbl in x_labels:
+            loc = ("xpath", f'//android.widget.TextView[@text="{lbl}"]')
+            assert self.forms.is_element_displayed(self.driver, loc, timeout=3), \
+                f"Stress graph X-axis label '{lbl}' is not shown"
+        logger.info("Stress graph plotted: X-axis labels %s present (Y-axis 0..100 is Canvas)", x_labels)
+        self.capture_screenshot("Stress_Graph")
+
+    # ── Step: scroll to the three stress stages ──────────────────────────────
+    def scroll_to_stress_stages(self):
+        """One single scroll to the state that shows the three stages
+        (Relaxed / Focused / Stressed) + TOTAL DURATION + Stress trends.
+
+        The scroll band sits OVER the text above the chart (insight / gauge) and
+        is tall with percent 1.0, so a SINGLE gesture moves the page far enough —
+        scrolling over the chart would be captured by it and move nothing."""
+        if not self.forms.is_element_displayed(self.driver, self.locator.STAGE_STRESSED, timeout=2):
+            size = self.driver.get_window_size()
+            w, h = int(size["width"]), int(size["height"])
+            self.driver.execute_script("mobile: scrollGesture", {
+                "left": int(w * 0.1), "top": int(h * 0.14),
+                "width": int(w * 0.8), "height": int(h * 0.34),
+                "direction": "down", "percent": 1.0,
+            })
+        assert self.forms.is_element_displayed(self.driver, self.locator.STAGE_STRESSED, timeout=5), \
+            "Could not bring the stress stages into view in one scroll"
+        self.capture_screenshot("Stress_Stages")
+
+    def verify_stress_stages_shown(self):
+        for name, loc in [("Relaxed", self.locator.STAGE_RELAXED),
+                          ("Focused", self.locator.STAGE_FOCUSED),
+                          ("Stressed", self.locator.STAGE_STRESSED)]:
+            assert self.forms.is_element_displayed(self.driver, loc, timeout=5), \
+                f"Stress stage '{name}' is not shown"
+            logger.info("Stress stage shown: %s", name)
+        self.capture_screenshot("Stress_Stages_Verified")
+
+    # ── internal helpers ─────────────────────────────────────────────────────
+    def _tap(self, locator, timeout=5):
+        el = self.mouse.find_element(self.driver, locator, timeout=timeout)
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
+        except Exception as e:
+            logger.warning("clickGesture failed (%s); coordinate tap", e)
+            rect = el.rect
+            self.mouse.click_coordinates(
+                self.driver, int(rect["x"] + rect["width"] / 2), int(rect["y"] + rect["height"] / 2))
+
+    @staticmethod
+    def _duration_to_minutes(text):
+        """'1h 15m' -> 75, '15m' -> 15, '8h 45m' -> 525. None if unparseable."""
+        if not text:
+            return None
+        h = re.search(r"(\d+)\s*h", str(text))
+        m = re.search(r"(\d+)\s*m", str(text))
+        if not h and not m:
+            return None
+        return (int(h.group(1)) * 60 if h else 0) + (int(m.group(1)) if m else 0)
+
+    # ── Step: sum of stage durations == TOTAL DURATION ───────────────────────
+    def verify_stage_durations_sum_equals_total(self):
+        """Tap each stage (Relaxed / Focused / Stressed), read its duration, sum
+        the three, and assert the sum equals the TOTAL DURATION shown."""
+        stages = [
+            ("Relaxed", self.locator.STAGE_RELAXED_ROW, self.locator.RELAXED_DURATION),
+            ("Focused", self.locator.STAGE_FOCUSED_ROW, self.locator.FOCUSED_DURATION),
+            ("Stressed", self.locator.STAGE_STRESSED_ROW, self.locator.STRESSED_DURATION),
+        ]
+        total_mins = 0
+        for name, row_loc, dur_loc in stages:
+            self._tap(row_loc)
+            dur = self.forms.get_value(self.driver, dur_loc, timeout=5)
+            mins = self._duration_to_minutes(dur)
+            assert mins is not None, f"'{name}' duration not readable: {dur!r}"
+            logger.info("%s duration: %s (%d min)", name, dur, mins)
+            total_mins += mins
+        total_text = self.forms.get_value(self.driver, self.locator.TOTAL_DURATION_VALUE, timeout=5)
+        total_shown = self._duration_to_minutes(total_text)
+        assert total_shown is not None, f"TOTAL DURATION not readable: {total_text!r}"
+        assert total_mins == total_shown, (
+            f"Sum of stage durations ({total_mins} min) != TOTAL DURATION "
+            f"({total_shown} min, {total_text!r})"
+        )
+        logger.info("OK: stages sum = %d min == TOTAL DURATION %d min (%s)",
+                    total_mins, total_shown, total_text)
+        self.capture_screenshot("Stress_Durations_Sum")
+
+    # ── Step: scroll down to the "Is today typical?" section ─────────────────
+    def scroll_to_is_today_typical(self):
+        """Scroll down (past the Stress trends section) until 'Is today typical?'
+        is visible. Here the charts ('How your day unfolded' + Stress trends) sit
+        in the upper/middle of the screen, so `mobile: scrollGesture` gets
+        captured by a chart and the page won't move. A RAW swipe (driver.swipe)
+        scrolls the page regardless of what's underneath."""
+        size = self.driver.get_window_size()
+        w, h = int(size["width"]), int(size["height"])
+        for _ in range(8):
+            if self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=1):
+                break
+            try:
+                # Start low (near TOTAL DURATION text, below the charts) and swipe
+                # far up so the touch-down lands on page text, not a chart.
+                self.driver.swipe(w // 2, int(h * 0.82), w // 2, int(h * 0.18), 600)
+            except Exception as e:
+                logger.debug("swipe failed: %s", e)
+                break
+        assert self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=3), \
+            "Could not scroll to the 'Is today typical?' section"
+        logger.info("Reached the 'Is today typical?' section")
+        self.capture_screenshot("Stress_Is_Today_Typical")
+
+    # ── Step: tap Stressed again to deselect / restore the full view ─────────
+    def tap_stressed_again_to_restore(self):
+        """Selecting a stage filters/fades the graph to that stage. Tap Stressed
+        once more to deselect it so the graph and all three stages show normally
+        again."""
+        self._tap(self.locator.STAGE_STRESSED_ROW)
+        logger.info("Tapped Stressed again to restore the full graph / stages view")
+        self.capture_screenshot("Stress_Stages_Restored")
