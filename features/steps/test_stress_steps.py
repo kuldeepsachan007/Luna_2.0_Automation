@@ -27,6 +27,12 @@ def go_to_previous_day(health_page: HealthPage):
     health_page.go_to_previous_day()
 
 
+@when('the user goes to the stable date')
+def go_to_stable_date(health_page: HealthPage):
+    logger.info("Navigating to the configured stable date (HEALTH_TARGET_DATE)")
+    health_page.go_to_stable_date()
+
+
 @when('the user scrolls to the Stress card')
 def scroll_to_stress_card(health_page: HealthPage):
     logger.info("Scrolling to the Stress card")

@@ -1,5 +1,7 @@
+import os
 import re
 import time
+from datetime import date, datetime
 
 from pages.base_page import BasePage
 from utility.liberaries.decorators import logger
@@ -95,6 +97,38 @@ class HealthPage(BasePage):
             el.click()
         logger.info("Tapped 'Previous day' (navigated one day back)")
         self.capture_screenshot("Health_Previous_Day")
+
+    def go_to_stable_date(self):
+        """Navigate the Health page from Today back to the configured stable date.
+
+        The target is read from the HEALTH_TARGET_DATE env var (format
+        YYYY-MM-DD). The number of 'Previous day' taps is computed as
+        (today - target).days, so the flow auto-adjusts: change only the env
+        date and it lands on that day. The Health page opens on Today, so this
+        is deterministic. If the var is unset, fall back to one day back."""
+        target_str = (os.getenv("HEALTH_TARGET_DATE") or "").strip()
+        if not target_str:
+            logger.info("HEALTH_TARGET_DATE not set; going one day back")
+            self.go_to_previous_day()
+            return
+        try:
+            target = datetime.strptime(target_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise AssertionError(
+                f"HEALTH_TARGET_DATE must be YYYY-MM-DD, got {target_str!r}")
+        today = date.today()
+        days_back = (today - target).days
+        assert days_back >= 0, (
+            f"HEALTH_TARGET_DATE {target} is in the future (today is {today}); "
+            "cannot navigate forward of Today")
+        logger.info("Stable date %s = %d day(s) back from today (%s)",
+                    target, days_back, today)
+        for i in range(days_back):
+            logger.info("Previous-day tap %d of %d", i + 1, days_back)
+            self.go_to_previous_day()
+        if days_back == 0:
+            logger.info("Stable date is Today; no navigation needed")
+        self.capture_screenshot("Health_Stable_Date")
 
     def verify_health_page(self):
         # The SpO2 tile is unique to the Health page (the bottom-nav "Health"

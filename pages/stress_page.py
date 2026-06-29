@@ -216,13 +216,20 @@ class StressPage(BasePage):
     def _wait_value_change(self, locator, prev, timeout=6):
         """Poll a locator's text until it differs from `prev` (or timeout). Used
         after switching a trends tab so we read the re-plotted value, not the old
-        one."""
+        one. The element briefly drops out of the tree while the tab re-renders,
+        so a missing element (get_value raising) is treated as 'not yet' and the
+        poll continues — never let a transient absence abort the wait."""
+        def _safe_get():
+            try:
+                return self.forms.get_value(self.driver, locator, timeout=1)
+            except Exception:
+                return None
         end = time.time() + timeout
         while time.time() < end:
-            cur = self.forms.get_value(self.driver, locator, timeout=1)
+            cur = _safe_get()
             if cur and cur != prev:
                 return cur
-        return self.forms.get_value(self.driver, locator, timeout=1)
+        return _safe_get()
 
     # ── Step: WEEK / MONTH / 6 MONTHS trends graphs plot correctly ───────────
     # NOTE: no separate scroll here — scroll_to_is_today_typical already lands on

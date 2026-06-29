@@ -8,7 +8,7 @@ Feature: Luna 2.0 Heart Rate details
   Scenario: View Heart Rate details and Sleep HR breakdown from Home
     Given the user is on the Home page
     When the user opens the Health page
-    And the user goes to the previous day
+    And the user goes to the stable date
     And the user opens the Heart Rate card
     Then the Heart Rate detail page is shown for the current date
     And a heart rate graph is plotted for the day

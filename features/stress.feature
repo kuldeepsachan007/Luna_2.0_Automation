@@ -8,7 +8,7 @@ Feature: Luna 2.0 Stress details
   Scenario: View Stress details from the Health page
     Given the user is on the Home page
     When the user opens the Health page
-    And the user goes to the previous day
+    And the user goes to the stable date
     And the user scrolls to the Stress card
     And the user opens the Stress card
     Then the Stress detail page is shown
