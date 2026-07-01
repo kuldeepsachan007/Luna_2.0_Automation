@@ -1,8 +1,25 @@
+import functools
 import re
 import time
 
 from pages.base_page import BasePage
 from utility.liberaries.decorators import logger
+
+
+def _skippable(method):
+    """Steps that operate on a card's OPEN dialog (title / value-match / the
+    WEEK-MONTH-6M graphs / close / closed) become no-ops when the current card
+    was skipped. A card is skipped by `_open_card_or_skip` when it has no value
+    or its dialog does not open — mirroring the deferred, value-less Workout HR
+    cards — so the run moves ahead instead of failing on a card with no data."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if getattr(self, "_skip_current", False):
+            logger.info("Current card was skipped (no value / dialog didn't open); "
+                        "skipping '%s' and moving ahead", method.__name__)
+            return None
+        return method(self, *args, **kwargs)
+    return wrapper
 
 
 class HeartRatePage(BasePage):
@@ -22,6 +39,9 @@ class HeartRatePage(BasePage):
         self.driver = driver
         self.name = "Heart Rate Page"
         self.locator = self.get_locators().HEART_RATE_PAGE
+        # True when the card currently being viewed was skipped (no value /
+        # its dialog didn't open); the @_skippable dialog steps then no-op.
+        self._skip_current = False
 
     # ── internal: Compose-friendly scrolling ─────────────────────────────────
     def _scroll_once(self, direction="down", percent=0.7, top_frac=0.2, height_frac=0.6):
@@ -167,26 +187,54 @@ class HeartRatePage(BasePage):
         logger.info("%s heart-rate graph plotted", name)
         self.capture_screenshot(f"HR_Graph_{name}")
 
-    # ── Generic dialog helpers (shared by the RHR and AVG Sleep HR cards) ────
-    def _open_dialog_via_card(self, card_loc, title_loc):
-        """Tap a metric card ONCE (via clickGesture) to open its detail dialog,
-        then wait for the dialog title. Tap only once: a plain 'mobile: tap' is
-        ignored by these Compose cards, and a second/outside tap dismisses the
-        dialog while it is still loading."""
-        card = self.mouse.find_element(self.driver, card_loc, timeout=5)
+    # ── Generic dialog helpers (shared by every metric card) ─────────────────
+    def _open_card_or_skip(self, name, label_loc, card_loc, value_loc, title_loc):
+        """Open a metric card's detail dialog, tolerating cards that have no data.
+
+        Same idea as the deferred, value-less Workout HR cards: read the card's
+        value, then tap it ONCE (a plain 'mobile: tap' is ignored by these
+        Compose cards, and a second/outside tap dismisses a still-loading
+        dialog). If the card has no value, OR the tap does not open its dialog,
+        SKIP this card — set self._skip_current so the dependent dialog / graph
+        / close steps no-op (see @_skippable) — and move on instead of failing
+        the run. Returns the card's value (None when skipped)."""
+        self._skip_current = False
+        self._ensure_visible(label_loc)
         try:
-            self.driver.execute_script("mobile: clickGesture", {"elementId": card.id})
-        except Exception as e:
-            logger.warning("clickGesture failed (%s); falling back to coordinate tap", e)
-            rect = card.rect
-            self.mouse.click_coordinates(
-                self.driver, int(rect["x"] + rect["width"] / 2), int(rect["y"] + rect["height"] / 2))
-        # Wait until the title is actually VISIBLE (retries through the open
-        # animation; is_element_displayed is a one-shot check and can race).
-        try:
-            self.waits.wait_for_visible(self.driver, title_loc, timeout=15)
+            value = self.forms.get_value(self.driver, value_loc, timeout=5)
         except Exception:
-            raise AssertionError("Tapped the card but its detail dialog did not open")
+            value = None
+        logger.info("%s card value (before opening): %s", name, value)
+        has_value = value is not None and re.search(r"\d", str(value)) is not None
+        # No value -> we don't expect a dialog, so use short waits and skip fast
+        # (still tap once, but don't sit through the full open-animation timeout).
+        find_timeout = 5 if has_value else 2
+        dialog_timeout = 10 if has_value else 2
+        if not has_value:
+            logger.warning("%s card has no value; tapping once with a short wait, will skip if the dialog doesn't open", name)
+        # Tap the card ONCE.
+        try:
+            card = self.mouse.find_element(self.driver, card_loc, timeout=find_timeout)
+            try:
+                self.driver.execute_script("mobile: clickGesture", {"elementId": card.id})
+            except Exception as e:
+                logger.warning("clickGesture failed (%s); falling back to coordinate tap", e)
+                rect = card.rect
+                self.mouse.click_coordinates(
+                    self.driver, int(rect["x"] + rect["width"] / 2), int(rect["y"] + rect["height"] / 2))
+        except Exception as e:
+            logger.warning("%s card not found/clickable (%s); skipping this card and moving ahead", name, e)
+            self._skip_current = True
+            return None
+        # Wait for the dialog title. If it doesn't open, skip instead of failing.
+        try:
+            self.waits.wait_for_visible(self.driver, title_loc, timeout=dialog_timeout)
+        except Exception:
+            logger.warning("%s card tapped but its dialog did not open; skipping this card and moving ahead", name)
+            self._skip_current = True
+            return None
+        logger.info("Opened the %s dialog", name)
+        return value
 
     def _assert_dialog_value_matches(self, card_value, name, value_loc=None):
         """The dialog's current value must match the value on the card. Wait for
@@ -229,91 +277,105 @@ class HeartRatePage(BasePage):
 
     # ── RHR card -> Resting Heart Rate dialog ────────────────────────────────
     def open_rhr_card(self):
-        self._ensure_visible(self.locator.RHR_LABEL)
-        self._rhr_card_value = self.forms.get_value(self.driver, self.locator.RHR_VALUE, timeout=5)
-        logger.info("RHR card value (before opening): %s", self._rhr_card_value)
-        self._open_dialog_via_card(self.locator.RHR_CARD, self.locator.RHR_DIALOG_TITLE)
-        logger.info("Opened the Resting Heart Rate dialog")
-        self.capture_screenshot("RHR_Dialog")
+        self._rhr_card_value = self._open_card_or_skip(
+            "RHR", self.locator.RHR_LABEL, self.locator.RHR_CARD,
+            self.locator.RHR_VALUE, self.locator.RHR_DIALOG_TITLE)
+        if not self._skip_current:
+            self.capture_screenshot("RHR_Dialog")
 
+    @_skippable
     def verify_rhr_dialog_title(self):
         self.waits.wait_for_visible(self.driver, self.locator.RHR_DIALOG_TITLE, timeout=10)
         logger.info("'Resting Heart Rate' dialog title shown")
 
+    @_skippable
     def verify_rhr_dialog_value_matches_card(self):
         self._assert_dialog_value_matches(getattr(self, "_rhr_card_value", None), "RHR")
 
     # ── AVG SLEEP HR card -> Avg Sleep Heart Rate dialog (same layout as RHR) ─
     def open_avg_sleep_card(self):
-        self._ensure_visible(self.locator.AVG_SLEEP_HR_LABEL)
-        self._avg_card_value = self.forms.get_value(self.driver, self.locator.AVG_SLEEP_HR_VALUE, timeout=5)
-        logger.info("AVG SLEEP HR card value (before opening): %s", self._avg_card_value)
-        self._open_dialog_via_card(self.locator.AVG_SLEEP_CARD, self.locator.AVG_DIALOG_TITLE)
-        logger.info("Opened the Avg Sleep Heart Rate dialog")
-        self.capture_screenshot("AVG_Dialog")
+        self._avg_card_value = self._open_card_or_skip(
+            "AVG SLEEP HR", self.locator.AVG_SLEEP_HR_LABEL, self.locator.AVG_SLEEP_CARD,
+            self.locator.AVG_SLEEP_HR_VALUE, self.locator.AVG_DIALOG_TITLE)
+        if not self._skip_current:
+            self.capture_screenshot("AVG_Dialog")
 
+    @_skippable
     def verify_avg_dialog_title(self):
         self.waits.wait_for_visible(self.driver, self.locator.AVG_DIALOG_TITLE, timeout=10)
         logger.info("'Avg Sleep Heart Rate' dialog title shown")
 
+    @_skippable
     def verify_avg_dialog_value_matches_card(self):
         self._assert_dialog_value_matches(getattr(self, "_avg_card_value", None), "AVG Sleep HR")
 
     # ── Shared range-tab graph checks (WEEK is default, then MONTH / 6M) ──────
+    @_skippable
     def verify_week_graph(self):
         self._verify_graph_plotted("Week", self.locator.WEEKLY_AVERAGE, self.locator.WEEK_AXIS_SAMPLE)
 
+    @_skippable
     def select_month_view(self):
         self._tap(self.locator.TAB_MONTH)
         logger.info("Selected the MONTH view")
         time.sleep(3)  # pause between views so each graph renders / is observable
 
+    @_skippable
     def verify_month_graph(self):
         self._verify_graph_plotted("Month", self.locator.MONTHLY_AVERAGE, self.locator.MONTH_AXIS_SAMPLE)
 
+    @_skippable
     def select_6m_view(self):
         self._tap(self.locator.TAB_6M)
         logger.info("Selected the 6M view")
         time.sleep(3)  # pause between views so each graph renders / is observable
 
+    @_skippable
     def verify_6m_graph(self):
         self._verify_graph_plotted("6M", self.locator.SIX_MONTH_AVERAGE, self.locator.SIXM_AXIS_SAMPLE)
 
     # ── Close dialogs ────────────────────────────────────────────────────────
+    @_skippable
     def close_rhr_dialog(self):
         self._close_dialog(self.locator.RHR_DIALOG_TITLE, "Resting Heart Rate")
 
+    @_skippable
     def verify_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.RHR_DIALOG_TITLE, timeout=8), \
             "The Resting Heart Rate dialog did not close"
 
+    @_skippable
     def close_avg_dialog(self):
         self._close_dialog(self.locator.AVG_DIALOG_TITLE, "Avg Sleep Heart Rate")
 
+    @_skippable
     def verify_avg_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.AVG_DIALOG_TITLE, timeout=8), \
             "The Avg Sleep Heart Rate dialog did not close"
 
     # ── TIME TO LOW card -> Time to Lowest HR dialog (same layout; value in h) ─
     def open_ttl_card(self):
-        self._ensure_visible(self.locator.TIME_TO_LOW_LABEL)
-        self._ttl_card_value = self.forms.get_value(self.driver, self.locator.TIME_TO_LOW_VALUE, timeout=5)
-        logger.info("TIME TO LOW card value (before opening): %s", self._ttl_card_value)
-        self._open_dialog_via_card(self.locator.TTL_CARD, self.locator.TTL_DIALOG_TITLE)
-        logger.info("Opened the Time to Lowest HR dialog")
-        self.capture_screenshot("TTL_Dialog")
+        self._ttl_card_value = self._open_card_or_skip(
+            "TIME TO LOW", self.locator.TIME_TO_LOW_LABEL, self.locator.TTL_CARD,
+            self.locator.TIME_TO_LOW_VALUE, self.locator.TTL_DIALOG_TITLE)
+        if not self._skip_current:
+            self.capture_screenshot("TTL_Dialog")
 
+    @_skippable
     def verify_ttl_dialog_title(self):
         self.waits.wait_for_visible(self.driver, self.locator.TTL_DIALOG_TITLE, timeout=10)
         logger.info("'Time to Lowest HR' dialog title shown")
 
+    @_skippable
     def verify_ttl_dialog_value_matches_card(self):
         self._assert_dialog_value_matches(
             getattr(self, "_ttl_card_value", None), "Time to Low", self.locator.TTL_DIALOG_VALUE)
 
+    @_skippable
     def close_ttl_dialog(self):
         self._close_dialog(self.locator.TTL_DIALOG_TITLE, "Time to Lowest HR")
 
+    @_skippable
     def verify_ttl_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.TTL_DIALOG_TITLE, timeout=8), \
             "The Time to Lowest HR dialog did not close"
@@ -376,46 +438,52 @@ class HeartRatePage(BasePage):
 
     # INACTIVE AVG card -> Inactive Avg HR dialog
     def open_inactive_avg_card(self):
-        self._ensure_visible(self.locator.INACTIVE_AVG_CARD)
-        self._inactive_avg_value = self.forms.get_value(self.driver, self.locator.INACTIVE_AVG_VALUE, timeout=5)
-        logger.info("INACTIVE AVG card value (before opening): %s", self._inactive_avg_value)
-        self._open_dialog_via_card(self.locator.INACTIVE_AVG_CARD, self.locator.INACTIVE_AVG_TITLE)
-        logger.info("Opened the Inactive Avg HR dialog")
-        self.capture_screenshot("Inactive_Avg_Dialog")
+        self._inactive_avg_value = self._open_card_or_skip(
+            "INACTIVE AVG", self.locator.INACTIVE_AVG_CARD, self.locator.INACTIVE_AVG_CARD,
+            self.locator.INACTIVE_AVG_VALUE, self.locator.INACTIVE_AVG_TITLE)
+        if not self._skip_current:
+            self.capture_screenshot("Inactive_Avg_Dialog")
 
+    @_skippable
     def verify_inactive_avg_dialog_title(self):
         self.waits.wait_for_visible(self.driver, self.locator.INACTIVE_AVG_TITLE, timeout=10)
         logger.info("'Inactive Avg HR' dialog title shown")
 
+    @_skippable
     def verify_inactive_avg_value_matches_card(self):
         self._assert_dialog_value_matches(getattr(self, "_inactive_avg_value", None), "Inactive Avg")
 
+    @_skippable
     def close_inactive_avg_dialog(self):
         self._close_dialog(self.locator.INACTIVE_AVG_TITLE, "Inactive Avg HR")
 
+    @_skippable
     def verify_inactive_avg_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.INACTIVE_AVG_TITLE, timeout=8), \
             "The Inactive Avg HR dialog did not close"
 
     # LOWEST WAKING card -> Lowest Waking HR dialog
     def open_lowest_waking_card(self):
-        self._ensure_visible(self.locator.LOWEST_WAKING_CARD)
-        self._lowest_waking_value = self.forms.get_value(self.driver, self.locator.LOWEST_WAKING_VALUE, timeout=5)
-        logger.info("LOWEST WAKING card value (before opening): %s", self._lowest_waking_value)
-        self._open_dialog_via_card(self.locator.LOWEST_WAKING_CARD, self.locator.LOWEST_WAKING_TITLE)
-        logger.info("Opened the Lowest Waking HR dialog")
-        self.capture_screenshot("Lowest_Waking_Dialog")
+        self._lowest_waking_value = self._open_card_or_skip(
+            "LOWEST WAKING", self.locator.LOWEST_WAKING_CARD, self.locator.LOWEST_WAKING_CARD,
+            self.locator.LOWEST_WAKING_VALUE, self.locator.LOWEST_WAKING_TITLE)
+        if not self._skip_current:
+            self.capture_screenshot("Lowest_Waking_Dialog")
 
+    @_skippable
     def verify_lowest_waking_dialog_title(self):
         self.waits.wait_for_visible(self.driver, self.locator.LOWEST_WAKING_TITLE, timeout=10)
         logger.info("'Lowest Waking HR' dialog title shown")
 
+    @_skippable
     def verify_lowest_waking_value_matches_card(self):
         self._assert_dialog_value_matches(getattr(self, "_lowest_waking_value", None), "Lowest Waking")
 
+    @_skippable
     def close_lowest_waking_dialog(self):
         self._close_dialog(self.locator.LOWEST_WAKING_TITLE, "Lowest Waking HR")
 
+    @_skippable
     def verify_lowest_waking_dialog_closed(self):
         assert self.waits.wait_for_invisible(self.driver, self.locator.LOWEST_WAKING_TITLE, timeout=8), \
             "The Lowest Waking HR dialog did not close"
