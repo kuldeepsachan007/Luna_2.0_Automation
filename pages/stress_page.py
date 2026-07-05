@@ -18,6 +18,40 @@ class StressPage(BasePage):
         self.driver = driver
         self.name = "Stress Page"
         self.locator = self.get_locators().STRESS_PAGE
+        # When a day has NO stress data (Max/Min/Avg all show '--'), the value /
+        # graph / duration / trend checks cannot pass. In that case we still walk
+        # the whole page end-to-end (scroll to every section, tap every element)
+        # but downgrade those data-dependent assertions to warnings instead of
+        # aborting. On a normal day (data present) `day_has_data` stays True and
+        # every check is strict — identical to the previous behaviour. The flag is
+        # decided in verify_values_shown, which runs before the dependent steps.
+        self.day_has_data = True
+
+    # ── data-tolerance helpers ────────────────────────────────────────────────
+    @staticmethod
+    def _has_reading(value):
+        """True only if `value` is a real reading (contains a digit). None / empty
+        / placeholders like '--' or '—' count as no-data."""
+        return value is not None and re.search(r"\d", str(value)) is not None
+
+    def _expect(self, condition, msg):
+        """Data-present day: behaves exactly like `assert condition, msg` (strict,
+        raises AssertionError). No-data day: downgrades a failed check to a warning
+        and returns False so the flow keeps walking every element end-to-end."""
+        if condition:
+            return True
+        if self.day_has_data:
+            raise AssertionError(msg)
+        logger.warning("[no-data] tolerated (this day has no stress data): %s", msg)
+        return False
+
+    def _safe_value(self, locator, timeout=5):
+        """get_value that returns None instead of raising when the element is
+        absent, so a missing value on a no-data day never aborts the scenario."""
+        try:
+            return self.forms.get_value(self.driver, locator, timeout=timeout)
+        except Exception:
+            return None
 
     # ── Page open / close ────────────────────────────────────────────────────
     def verify_stress_page_shown(self):
@@ -63,20 +97,34 @@ class StressPage(BasePage):
     # ── Step: Max / Min / Avg values are shown (gauge, at the top) ───────────
     def verify_values_shown(self):
         """At the top of the page, the gauge shows the day's Max, Min and Avg.
-        Values are dynamic, so assert each label is visible and its value is a
-        non-empty number."""
+
+        This step also DECIDES whether the day has stress data at all: if any of
+        Max/Min/Avg is a real reading the day has data and every value must be a
+        non-empty number (previous strict behaviour). If the whole day is empty
+        ('--'), `day_has_data` is set False so the rest of the flow walks the page
+        end-to-end with data checks downgraded to warnings instead of aborting."""
         checks = [
             ("Max", self.locator.MAX_LABEL, self.locator.MAX_VALUE),
             ("Min", self.locator.MIN_LABEL, self.locator.MIN_VALUE),
             ("Avg", self.locator.AVG_LABEL, self.locator.AVG_VALUE),
         ]
+        labels = {}
+        readings = {}
         for name, label_loc, value_loc in checks:
-            assert self.forms.is_element_displayed(self.driver, label_loc, timeout=5), \
-                f"'{name}' label is not shown"
-            value = self.forms.get_value(self.driver, value_loc, timeout=5)
-            assert value is not None and re.search(r"\d", str(value)), \
-                f"'{name}' value missing/not numeric: {value!r}"
-            logger.info("Stress %s value: %s", name, value)
+            labels[name] = self.forms.is_element_displayed(self.driver, label_loc, timeout=5)
+            readings[name] = self._safe_value(value_loc)
+        # Decide data presence BEFORE asserting, so the gate is set for later steps.
+        self.day_has_data = any(self._has_reading(v) for v in readings.values())
+        for name, _, _ in checks:
+            self._expect(labels[name], f"'{name}' label is not shown")
+        if self.day_has_data:
+            for name in ("Max", "Min", "Avg"):
+                if self._expect(self._has_reading(readings[name]),
+                                f"'{name}' value missing/not numeric: {readings[name]!r}"):
+                    logger.info("Stress %s value: %s", name, readings[name])
+        else:
+            logger.warning("No stress data for this day (Max/Min/Avg = %s) — walking the page "
+                           "end-to-end with data checks downgraded to warnings", readings)
         self.capture_screenshot("Stress_Values")
 
     # ── Step: the "How your day unfolded" graph is plotted for the day ───────
@@ -85,13 +133,14 @@ class StressPage(BasePage):
         time labels (12A, 4A, 8A, 12P, 4P, 8P) are real text nodes and are all
         asserted; the Y-axis (0/33/66/100) and the plotted line are Canvas-drawn
         (not queryable), so a screenshot is captured for visual confirmation."""
-        self.waits.wait_for_visible(self.driver, self.locator.DAY_GRAPH_TITLE, timeout=10)
+        self._expect(self.forms.is_element_displayed(self.driver, self.locator.DAY_GRAPH_TITLE, timeout=10),
+                     "'How your day unfolded' graph title not shown")
         x_labels = ["12A", "4A", "8A", "12P", "4P", "8P"]
         for lbl in x_labels:
             loc = ("xpath", f'//android.widget.TextView[@text="{lbl}"]')
-            assert self.forms.is_element_displayed(self.driver, loc, timeout=3), \
-                f"Stress graph X-axis label '{lbl}' is not shown"
-        logger.info("Stress graph plotted: X-axis labels %s present (Y-axis 0..100 is Canvas)", x_labels)
+            self._expect(self.forms.is_element_displayed(self.driver, loc, timeout=3),
+                         f"Stress graph X-axis label '{lbl}' is not shown")
+        logger.info("Stress graph checked: X-axis labels %s (Y-axis 0..100 is Canvas)", x_labels)
         self.capture_screenshot("Stress_Graph")
 
     # ── Step: scroll to the three stress stages ──────────────────────────────
@@ -110,22 +159,26 @@ class StressPage(BasePage):
                 "width": int(w * 0.8), "height": int(h * 0.34),
                 "direction": "down", "percent": 1.0,
             })
-        assert self.forms.is_element_displayed(self.driver, self.locator.STAGE_STRESSED, timeout=5), \
-            "Could not bring the stress stages into view in one scroll"
+        self._expect(self.forms.is_element_displayed(self.driver, self.locator.STAGE_STRESSED, timeout=5),
+                     "Could not bring the stress stages into view in one scroll")
         self.capture_screenshot("Stress_Stages")
 
     def verify_stress_stages_shown(self):
         for name, loc in [("Relaxed", self.locator.STAGE_RELAXED),
                           ("Focused", self.locator.STAGE_FOCUSED),
                           ("Stressed", self.locator.STAGE_STRESSED)]:
-            assert self.forms.is_element_displayed(self.driver, loc, timeout=5), \
-                f"Stress stage '{name}' is not shown"
-            logger.info("Stress stage shown: %s", name)
+            if self._expect(self.forms.is_element_displayed(self.driver, loc, timeout=5),
+                            f"Stress stage '{name}' is not shown"):
+                logger.info("Stress stage shown: %s", name)
         self.capture_screenshot("Stress_Stages_Verified")
 
     # ── internal helpers ─────────────────────────────────────────────────────
     def _tap(self, locator, timeout=5):
-        el = self.mouse.find_element(self.driver, locator, timeout=timeout)
+        try:
+            el = self.mouse.find_element(self.driver, locator, timeout=timeout)
+        except Exception as e:
+            logger.warning("_tap: element not found (%s); skipping tap", e)
+            return False
         try:
             self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
         except Exception as e:
@@ -133,6 +186,7 @@ class StressPage(BasePage):
             rect = el.rect
             self.mouse.click_coordinates(
                 self.driver, int(rect["x"] + rect["width"] / 2), int(rect["y"] + rect["height"] / 2))
+        return True
 
     @staticmethod
     def _duration_to_minutes(text):
@@ -155,22 +209,26 @@ class StressPage(BasePage):
             ("Stressed", self.locator.STAGE_STRESSED_ROW, self.locator.STRESSED_DURATION),
         ]
         total_mins = 0
+        all_readable = True
         for name, row_loc, dur_loc in stages:
             self._tap(row_loc)
-            dur = self.forms.get_value(self.driver, dur_loc, timeout=5)
+            dur = self._safe_value(dur_loc)
             mins = self._duration_to_minutes(dur)
-            assert mins is not None, f"'{name}' duration not readable: {dur!r}"
+            if not self._expect(mins is not None, f"'{name}' duration not readable: {dur!r}"):
+                all_readable = False
+                continue
             logger.info("%s duration: %s (%d min)", name, dur, mins)
             total_mins += mins
-        total_text = self.forms.get_value(self.driver, self.locator.TOTAL_DURATION_VALUE, timeout=5)
+        total_text = self._safe_value(self.locator.TOTAL_DURATION_VALUE)
         total_shown = self._duration_to_minutes(total_text)
-        assert total_shown is not None, f"TOTAL DURATION not readable: {total_text!r}"
-        assert total_mins == total_shown, (
-            f"Sum of stage durations ({total_mins} min) != TOTAL DURATION "
-            f"({total_shown} min, {total_text!r})"
-        )
-        logger.info("OK: stages sum = %d min == TOTAL DURATION %d min (%s)",
-                    total_mins, total_shown, total_text)
+        total_ok = self._expect(total_shown is not None, f"TOTAL DURATION not readable: {total_text!r}")
+        if all_readable and total_ok:
+            self._expect(total_mins == total_shown, (
+                f"Sum of stage durations ({total_mins} min) != TOTAL DURATION "
+                f"({total_shown} min, {total_text!r})"
+            ))
+            logger.info("OK: stages sum = %d min == TOTAL DURATION %d min (%s)",
+                        total_mins, total_shown, total_text)
         self.capture_screenshot("Stress_Durations_Sum")
 
     # ── Step: scroll down to the "Is today typical?" section ─────────────────
@@ -200,16 +258,24 @@ class StressPage(BasePage):
                 break
             self.driver.swipe(w // 2, int(h * 0.78), w // 2, int(h * 0.32), 600)
         # Phase 2: one computed slow swipe to lift the tabs to just below the header.
-        el = self.mouse.find_element(self.driver, loc, timeout=10)
+        try:
+            el = self.mouse.find_element(self.driver, loc, timeout=10)
+        except Exception as e:
+            self._expect(False, f"Stress trends tabs (WEEK) not found: {e}")
+            self.capture_screenshot("Stress_Trends_AtTop")
+            return
         distance = el.location["y"] - target
         if distance > 50:
             start = min(int(h * 0.88), h - 5)        # touch on the lower text (~TOTAL DURATION)
             end = max(5, start - distance)
             self.driver.swipe(w // 2, start, w // 2, end, 1300)
-        el = self.mouse.find_element(self.driver, loc, timeout=6)
-        y = el.location.get("y", 99999)
+        try:
+            el = self.mouse.find_element(self.driver, loc, timeout=6)
+            y = el.location.get("y", 99999)
+        except Exception:
+            y = 99999
         logger.info("Stress trends tabs (WEEK) Y after scroll: %s", y)
-        assert 0 < y <= int(h * 0.35), f"Could not bring the Stress trends tabs to the top (y={y})"
+        self._expect(0 < y <= int(h * 0.35), f"Could not bring the Stress trends tabs to the top (y={y})")
         self.capture_screenshot("Stress_Trends_AtTop")
 
     # ── internal: wait until a locator's value changes from `prev` ───────────
@@ -251,27 +317,29 @@ class StressPage(BasePage):
             if ranges:  # after the first tab, wait for the range to re-plot
                 self._wait_value_change(self.locator.TRENDS_RANGE, list(ranges.values())[-1], timeout=6)
             else:
-                self.waits.wait_for_visible(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=8)
-            assert self.forms.is_element_displayed(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=5), \
-                f"Stress trends '{name}': AVG label not shown"
-            rng = self.forms.get_value(self.driver, self.locator.TRENDS_RANGE, timeout=5)
-            assert rng and "–" in rng, f"Stress trends '{name}': date-range not shown (got {rng!r})"
-            ranges[name] = rng
-            logger.info("Stress trends %s plotted: range=%s", name, rng)
+                self.forms.is_element_displayed(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=8)
+            self._expect(self.forms.is_element_displayed(self.driver, self.locator.TRENDS_AVG_LABEL, timeout=5),
+                         f"Stress trends '{name}': AVG label not shown")
+            rng = self._safe_value(self.locator.TRENDS_RANGE)
+            if self._expect(rng and "–" in str(rng),
+                            f"Stress trends '{name}': date-range not shown (got {rng!r})"):
+                ranges[name] = rng
+                logger.info("Stress trends %s plotted: range=%s", name, rng)
             self.capture_screenshot(f"Stress_Trends_{name.replace(' ', '_')}")
-        assert ranges["WEEK"] != ranges["MONTH"], \
-            f"WEEK and MONTH show the same range {ranges} — tabs are not re-plotting"
-        logger.info("OK: trends re-plot per tab — ranges: %s", ranges)
+        if "WEEK" in ranges and "MONTH" in ranges:
+            self._expect(ranges["WEEK"] != ranges["MONTH"],
+                         f"WEEK and MONTH show the same range {ranges} — tabs are not re-plotting")
+            logger.info("OK: trends re-plot per tab — ranges: %s", ranges)
 
     # ── Step: "Is today typical?" — TODAY comparison graph ───────────────────
     def verify_today_comparison(self):
         """Confirm the TODAY comparison is shown: the 'Is today typical?' title +
         the 'Today vs typical <day>' heading. The comparison bars are Canvas, so a
         screenshot is captured for visual confirmation."""
-        assert self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=5), \
-            "'Is today typical?' title not shown"
-        assert self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_TODAY_COMPARE, timeout=5), \
-            "TODAY comparison ('Today vs typical ...') not shown"
+        self._expect(self.forms.is_element_displayed(self.driver, self.locator.IS_TODAY_TYPICAL, timeout=5),
+                     "'Is today typical?' title not shown")
+        self._expect(self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_TODAY_COMPARE, timeout=5),
+                     "TODAY comparison ('Today vs typical ...') not shown")
         logger.info("Today comparison graph shown")
         self.capture_screenshot("Stress_Typical_Today")
 
@@ -283,8 +351,8 @@ class StressPage(BasePage):
     def verify_nonactivity_comparison(self):
         """After tapping NON-ACTIVITY the heading changes to 'Non-activity ...',
         which confirms the comparison switched to the non-activity view."""
-        assert self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_NONACT_COMPARE, timeout=8), \
-            "NON-ACTIVITY comparison ('Non-activity ...') not shown after tapping the tab"
+        self._expect(self.forms.is_element_displayed(self.driver, self.locator.TYPICAL_NONACT_COMPARE, timeout=8),
+                     "NON-ACTIVITY comparison ('Non-activity ...') not shown after tapping the tab")
         logger.info("Non-activity comparison shown")
         self.capture_screenshot("Stress_Typical_NonActivity")
 

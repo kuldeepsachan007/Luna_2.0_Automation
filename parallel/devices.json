@@ -1,0 +1,31 @@
+{
+  "_comment": "Device inventory + per-device port assignments for the parallel runner. Ports are chosen to NOT clash with a manually-started Appium on 4723. Each device gets a unique appium_port + system_port + mjpeg_port so two UiAutomator2 sessions can run at once. 'marker' is the default pytest marker run on that device when no marker is passed on the CLI.",
+  "appium": {
+    "host": "127.0.0.1",
+    "base_path": "/"
+  },
+  "devices": [
+    {
+      "udid": "70f31eb6b9fc",
+      "name": "POCO-2201116PI",
+      "platform_version": "12",
+      "appium_port": 4741,
+      "system_port": 8201,
+      "mjpeg_port": 7811,
+      "marker": "heart_rate"
+    },
+    {
+      "udid": "TWL77DU8U4TKIBYT",
+      "name": "OnePlus-CPH2401",
+      "platform_version": "14",
+      "appium_port": 4742,
+      "system_port": 8202,
+      "mjpeg_port": 7812,
+      "marker": "stress",
+      "_extra_caps_note": "enforceXpath1 works around 'Cannot set AccessibilityNodeInfo field mSealed to true' XPath bug seen on this OnePlus/Android 14 ROM during date navigation.",
+      "extra_caps": {
+        "appium:settings[enforceXpath1]": true
+      }
+    }
+  ]
+}

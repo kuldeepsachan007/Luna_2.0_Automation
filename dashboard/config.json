@@ -1,0 +1,28 @@
+{
+  "_comment": "Dashboard feature list + feature->device mapping. Device details (ports, caps, name) live in parallel/devices.json and are looked up by udid. Change the mapping here or from the dashboard UI (persisted back to this file). A feature can map to any connected device; two features on the SAME device are serialised (device lock), different devices run truly in parallel.",
+  "features": [
+    {
+      "key": "sleep",
+      "name": "Sleep",
+      "marker": "sleep",
+      "icon": "🌙"
+    },
+    {
+      "key": "heart_rate",
+      "name": "Heart Rate",
+      "marker": "heart_rate",
+      "icon": "❤️"
+    },
+    {
+      "key": "stress",
+      "name": "Stress",
+      "marker": "stress",
+      "icon": "🧠"
+    }
+  ],
+  "feature_device_map": {
+    "sleep": "70f31eb6b9fc",
+    "heart_rate": "70f31eb6b9fc",
+    "stress": "70f31eb6b9fc"
+  }
+}

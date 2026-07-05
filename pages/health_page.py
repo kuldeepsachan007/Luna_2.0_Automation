@@ -87,6 +87,14 @@ class HealthPage(BasePage):
         self.mouse.click(self.driver, self.locator.NAV_HEALTH)
         self.capture_screenshot("Health_Tab_Tapped")
 
+    def tap_home_tab(self):
+        """Tap the bottom-nav Home tab to return to the Home page WITHOUT
+        relaunching the app (HomePage.go_to_home_page relaunches when off-Home;
+        we want an in-app navigation so the app doesn't restart at the end)."""
+        self.mouse.click(self.driver, self.locator.NAV_HOME)
+        logger.info("Tapped bottom-nav Home tab (no relaunch)")
+        self.capture_screenshot("Home_Tab_Tapped")
+
     def go_to_previous_day(self):
         """Tap the 'Previous day' arrow next to the date to move one day back
         (e.g. from Today to the previous date, which has complete data)."""
@@ -97,6 +105,19 @@ class HealthPage(BasePage):
             el.click()
         logger.info("Tapped 'Previous day' (navigated one day back)")
         self.capture_screenshot("Health_Previous_Day")
+
+    def go_to_next_day(self):
+        """Tap the 'Next day' arrow to move one day forward. Returns False if the
+        arrow is absent — the app has no future dates, so this means we are on
+        Today. Used to reset the date to Today before stepping back."""
+        if not self.forms.is_element_displayed(self.driver, self.locator.NAV_NEXT_DAY, timeout=1):
+            return False
+        el = self.mouse.find_element(self.driver, self.locator.NAV_NEXT_DAY, timeout=3)
+        try:
+            self.driver.execute_script("mobile: clickGesture", {"elementId": el.id})
+        except Exception:
+            el.click()
+        return True
 
     def go_to_stable_date(self):
         """Navigate the Health page from Today back to the configured stable date.
@@ -121,6 +142,17 @@ class HealthPage(BasePage):
         assert days_back >= 0, (
             f"HEALTH_TARGET_DATE {target} is in the future (today is {today}); "
             "cannot navigate forward of Today")
+        # The Health page RETAINS the last-viewed date across runs (noReset), so
+        # it does NOT reliably open on Today — blindly tapping 'Previous day'
+        # days_back times drifts further back each run. First step FORWARD to
+        # Today (tapping 'Next day' can never go past Today; the arrow disappears
+        # there), then step back exactly days_back. This lands on the target
+        # regardless of where the page started.
+        logger.info("Resetting Health to Today before stepping back (avoids date drift)")
+        for _ in range(days_back + 40):
+            if not self.go_to_next_day():
+                break  # no Next-day arrow => already on Today
+            time.sleep(0.3)
         logger.info("Stable date %s = %d day(s) back from today (%s)",
                     target, days_back, today)
         for i in range(days_back):

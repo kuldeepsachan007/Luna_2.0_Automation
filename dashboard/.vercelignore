@@ -1,0 +1,11 @@
+# Vercel hosts ONLY the UI (index.html + vercel.json).
+# Everything below is backend/local-only and must NOT be uploaded to the cloud.
+app.py
+config.json
+run_dashboard.bat
+report.bat
+README.md
+DEPLOY.md
+_output/
+__pycache__/
+.gitignore
