@@ -16,3 +16,7 @@ __pycache__/
 *.env*.bak
 venv/
 myenv/
+
+# Tunnel binary + logs (local only, never push)
+cloudflared.exe
+tunnel.*.log

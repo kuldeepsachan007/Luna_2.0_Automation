@@ -18,11 +18,18 @@
       "name": "Stress",
       "marker": "stress",
       "icon": "🧠"
+    },
+    {
+      "key": "activity",
+      "name": "Activity",
+      "marker": "activity",
+      "icon": "🏃"
     }
   ],
   "feature_device_map": {
-    "sleep": "70f31eb6b9fc",
-    "heart_rate": "70f31eb6b9fc",
-    "stress": "70f31eb6b9fc"
+    "sleep": "3140d1cb",
+    "heart_rate": "3140d1cb",
+    "stress": "3140d1cb",
+    "activity": "3140d1cb"
   }
 }

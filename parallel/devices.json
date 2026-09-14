@@ -26,6 +26,19 @@
       "extra_caps": {
         "appium:settings[enforceXpath1]": true
       }
+    },
+    {
+      "udid": "3140d1cb",
+      "name": "OnePlus-CPH2447",
+      "platform_version": "16",
+      "appium_port": 4743,
+      "system_port": 8203,
+      "mjpeg_port": 7813,
+      "marker": "sleep",
+      "_extra_caps_note": "OnePlus Android 14+ ROM: same AccessibilityNodeInfo mSealed XPath bug, so enforceXpath1 workaround applied here too.",
+      "extra_caps": {
+        "appium:settings[enforceXpath1]": true
+      }
     }
   ]
 }
